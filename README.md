@@ -17,9 +17,9 @@ PORTESCO already runs the operation. Parent communication is the #1 pain point â
 
 ## Stack
 
-Approach: AI-assisted development with Lovable, Claude Code, and Codex
-Frontend: Web-first, mobile-responsive
-Backend: Cloud-hosted database (TBD as we ship Sprint 1)
+Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS
+Backend: Supabase (PostgreSQL with Row-Level Security, Auth, Storage)
+Hosting: Vercel
 PWA: Mobile-first, installable
 
 ## Roadmap
