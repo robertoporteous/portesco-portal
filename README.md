@@ -1,25 +1,41 @@
-# PORTESCO Parent Portal
+# PORTESCO Operating Platform
 
-Mobile-first PWA for PORTESCO Sports parents — an outsourced extracurricular activities operator running sports, arts, and academic programs for 13 schools and 950+ students in Panama.
+The operational platform for PORTESCO Sports — an outsourced extracurricular activities operator running sports, arts, and academic programs for 13 schools and 950+ students in Panama.
 
-## Problem
+## Vision
 
-Parents have no systematic way to see how their children are progressing in PORTESCO programs. Communication happens ad-hoc through WhatsApp, and coaches' progress notes never reach families consistently. This is the #1 operational pain point in our business.
+A unified platform with four surfaces sharing the same data layer:
 
-## Solution
+- **Parent Portal** — families track enrollment, schedules, attendance, progress reports, and billing
+- **Attendo** — coaches log daily attendance from their phones
+- **Impulso** — coaches upload monthly progress reports; parents read them
+- **PORTESCOpay** — internal billing and payments tracking
 
-A mobile-first Progressive Web App where parents can view enrollment, schedules, attendance, monthly progress reports, and billing.
+## Why this exists
+
+PORTESCO already runs the operation. Parent communication is the #1 pain point — today it lives across WhatsApp, Google Sheets, and email. This platform digitizes the parts of the business that don't scale past where we are now.
 
 ## Stack
 
 - **Frontend:** Next.js 14 (App Router), TypeScript, Tailwind CSS
-- **Backend:** Supabase (PostgreSQL, Auth, Storage)
-- **User types:** Parents, staff (coaches/coordinators), admin
+- **Backend:** Supabase (PostgreSQL with Row-Level Security, Auth, Storage)
+- **Hosting:** Vercel
+- **PWA:** Mobile-first, installable
+
+## Roadmap
+
+- [x] Schema design (12 tables, RLS policies)
+- [x] PRD and user flows
+- [ ] Sprint 1 — Auth + Parent dashboard
+- [ ] Sprint 2 — Coach progress reports (Impulso)
+- [ ] Sprint 3 — Attendance (Attendo)
+- [ ] Sprint 4 — Billing module (PORTESCOpay)
+- [ ] Beta with 2 pilot schools
 
 ## Status
 
-In early development. Schema and PRD complete; building authentication and parent dashboard first.
+In early development. Schema and PRD complete. Currently building authentication and parent dashboard.
 
 ---
 
-Learn more about PORTESCO: [portescosports.com](https://robertoporteous.github.io/Portescosports/)
+Learn more about PORTESCO: [robertoporteous.github.io/Portescosports](https://robertoporteous.github.io/Portescosports/)
