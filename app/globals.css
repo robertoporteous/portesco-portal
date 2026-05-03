@@ -4,6 +4,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Portesco brand tokens */
+:root {
+  --portesco-red: #E31E24;
+  --portesco-blue: #1E3A8A;
+  --portesco-black: #000000;
+  --portesco-white: #FFFFFF;
+  --portesco-gray-light: #F5F5F5;
+  --portesco-gray-mid: #9CA3AF;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
