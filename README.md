@@ -17,7 +17,7 @@ PORTESCO already runs the operation. Parent communication is the #1 pain point â
 
 ## Stack
 
-Frontend: Next.js 14 (App Router), TypeScript, Tailwind CSS
+Frontend: Next.js 16 (App Router), TypeScript, Tailwind CSS
 Backend: Supabase (PostgreSQL with Row-Level Security, Auth, Storage)
 Hosting: Vercel
 PWA: Mobile-first, installable
