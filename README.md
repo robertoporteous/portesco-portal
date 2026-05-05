@@ -1,6 +1,6 @@
 # PORTESCO Operating Platform
 
-The operational platform for PORTESCO Sports — an outsourced extracurricular activities operator running sports, arts, and academic programs for 13 schools and 950+ students in Panama.
+The operational platform for PORTESCO Sports — an outsourced extracurricular activities operator running sports, arts, and academic programs for 12 schools and 950+ students in Panama.
 
 ## Vision
 
