@@ -22,17 +22,18 @@ data layer:
 
 ## Current Status
 
-This repository is in early development. It currently contains the product PRD,
-the main route structure, visual layouts, business types, brand tokens, and
-placeholder screens for the parent, staff, and admin portals.
+The repository now has a working **foundation database layer** running against
+a real Supabase project: schema migrations, row-level security policies, and a
+small demo seed are all applied and verified. Auth wiring and the parent
+dashboard read path land next.
 
-The app is not production-ready yet. Supabase authentication, database
-migrations, row-level security, real data loading, and complete user workflows
-are still pending.
+Magic-link authentication, the parent vertical slice (read-only dashboard
+sourced from the live database), and production deployment are still pending —
+those close out Sprint 1.
 
 ## What Exists Today
 
-- Next.js App Router project with TypeScript.
+- Next.js 16 (Proxy convention) + React 19 + TypeScript App Router project.
 - Tailwind CSS 4 and PORTESCO brand tokens.
 - Parent, staff, and admin route groups.
 - Mobile parent layout with bottom navigation.
@@ -44,27 +45,41 @@ are still pending.
   states, ratings, payment rules, and seed schools.
 - PWA manifest.
 - Initial API stubs for auth, cron, and webhook routes.
+- **Supabase client packages installed:** `@supabase/supabase-js@2.105.3` and
+  `@supabase/ssr@0.10.2` (exact pins).
+- **SQL migrations applied to a live Supabase project**
+  (`supabase/migrations/0001_init.sql`, `0002_rls.sql`, `0003_seed.sql`):
+  7 tables, 3 enums, RLS enabled on every table, 24 SELECT-only policies
+  covering parent / coordinator / professor / admin-override, and a
+  CIDMI demo seed (1 school, 4 activities, 1 user, 1 student,
+  2 enrollments).
 - Full product requirements document:
   [`PORTESCO_Parent_Portal_PRD.md`](./PORTESCO_Parent_Portal_PRD.md).
+- Engineering status with Sprint 1 schema decisions:
+  [`docs/IMPLEMENTATION_STATUS.md`](./docs/IMPLEMENTATION_STATUS.md).
 
 ## Still Pending
 
-- Install and configure Supabase packages.
-- Create real Supabase SQL migrations and RLS policies.
-- Implement magic link authentication.
-- Protect routes by role.
-- Replace placeholder screens with functional data-driven views.
-- Build CRUD workflows for students, activities, attendance, reports, events,
-  news, and staff.
+- Wire magic-link authentication end-to-end (callback, session refresh in
+  `proxy.ts`, role-based redirects).
+- Translate Supabase email templates to Spanish.
+- Replace the parent placeholder dashboard with a server-rendered slice
+  reading the live database (children + their enrolled activities).
+- Production deployment to Vercel and DNS for `app.portescosports.com`.
+- INSERT / UPDATE / DELETE RLS policies (deferred to Sprint 2 alongside
+  Attendo and admin CRUD).
+- Build the rest of the surfaces: Attendo (attendance), Impulso (monthly
+  reports), PORTESCOpay (billing).
 - Add real PWA icons and service worker behavior.
-- Add tests and production deployment configuration.
+- Add tests and continuous integration.
 
 ## Stack
 
-- **Frontend:** Next.js 16, App Router, React 19, TypeScript
+- **Frontend:** Next.js 16 (Proxy convention), App Router, React 19, TypeScript
 - **Styling:** Tailwind CSS 4
 - **UI utilities:** shadcn, Base UI, lucide-react
-- **Planned backend:** Supabase, PostgreSQL, Auth, Storage, Row-Level Security
+- **Backend:** Supabase (Postgres + Auth + Storage + RLS) — schema and read-only
+  RLS live; auth wiring next
 - **Planned hosting:** Vercel
 - **Target experience:** mobile-first PWA
 
@@ -73,13 +88,15 @@ are still pending.
 - [x] PRD and user flows
 - [x] Route structure for parent, staff, and admin portals
 - [x] Visual skeleton and brand tokens
-- [ ] Supabase schema and migrations
+- [x] Supabase schema and migrations (`0001_init.sql`)
+- [x] Row-level security policies — read-only (`0002_rls.sql`)
+- [x] CIDMI demo seed (`0003_seed.sql`)
 - [ ] Supabase Auth with magic link
-- [ ] Role-based route protection
+- [ ] Role-based route protection in `proxy.ts`
 - [ ] Sprint 1: parent dashboard with real data
-- [ ] Sprint 2: coach progress reports
-- [ ] Sprint 3: attendance workflow
-- [ ] Sprint 4: billing module
+- [ ] Sprint 2: attendance workflow (Attendo) + write-side RLS
+- [ ] Sprint 3: monthly progress reports (Impulso)
+- [ ] Sprint 4: billing (PORTESCOpay)
 - [ ] Beta with pilot schools
 
 ## Local Development
