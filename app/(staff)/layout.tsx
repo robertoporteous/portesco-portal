@@ -1,3 +1,5 @@
+import { LogoutButton } from "@/components/shared/logout-button";
+
 // Staff portal layout with sidebar — Sprint 3
 export default function StaffLayout({
   children,
@@ -12,12 +14,13 @@ export default function StaffLayout({
         style={{ backgroundColor: "var(--portesco-blue)", color: "white" }}
       >
         <p className="text-sm font-semibold mb-6">PORTESCO Staff</p>
-        <nav className="flex flex-col gap-2 text-sm">
+        <nav className="flex flex-col gap-2 text-sm flex-1">
           <span>Dashboard</span>
           <span>Asistencia</span>
           <span>Reportes</span>
           <span>Estudiantes</span>
         </nav>
+        <LogoutButton />
       </aside>
       <main className="flex-1 bg-gray-50">{children}</main>
     </div>

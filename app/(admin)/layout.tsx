@@ -1,3 +1,5 @@
+import { LogoutButton } from "@/components/shared/logout-button";
+
 // Admin layout with full navigation — Sprint 4
 export default function AdminLayout({
   children,
@@ -12,7 +14,7 @@ export default function AdminLayout({
         style={{ backgroundColor: "var(--portesco-blue)", color: "white" }}
       >
         <p className="text-sm font-semibold mb-6">PORTESCO Admin</p>
-        <nav className="flex flex-col gap-2 text-sm">
+        <nav className="flex flex-col gap-2 text-sm flex-1">
           <span>Dashboard</span>
           <span>Colegios</span>
           <span>Estudiantes</span>
@@ -22,6 +24,7 @@ export default function AdminLayout({
           <span>Noticias</span>
           <span>Configuración</span>
         </nav>
+        <LogoutButton />
       </aside>
       <main className="flex-1 bg-gray-50">{children}</main>
     </div>
