@@ -1,5 +1,6 @@
 // Supabase session refresh helper — called from root proxy.ts on every request.
-// Refreshes the auth cookie and returns the response with updated Set-Cookie.
+// Refreshes the auth cookie and returns the response, user, and a client
+// the caller can use for further queries within the same request.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -31,5 +32,5 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return { supabaseResponse, user };
+  return { supabaseResponse, supabase, user };
 }

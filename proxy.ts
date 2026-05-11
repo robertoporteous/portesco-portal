@@ -1,20 +1,70 @@
-// Route protection proxy — Sprint 1
-// Next.js 16: middleware.ts renamed to proxy.ts
-// Protects parent (/), staff (/staff/*), and admin (/admin/*) routes by role
-// Full auth check added when Supabase is configured
-
+// Root proxy (Next.js 16 — formerly middleware.ts).
+// Refreshes the Supabase auth cookie and gates protected routes by role.
 import { NextResponse, type NextRequest } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-export function proxy(request: NextRequest) {
-  // TODO: call updateSession(request) from lib/supabase/middleware once Supabase is set up
-  // TODO: check auth cookie and user role, then redirect unauthorized access:
-  //   - Unauthenticated users hitting / → redirect to /login
-  //   - Parents hitting /staff or /admin → redirect to /
-  //   - Staff hitting /admin → redirect to /staff
-  //   - Admin has access everywhere
+// Routes that never require an authenticated session.
+// Note: /api/* handles its own auth (cron, webhook, health) — proxy only
+// refreshes cookies for them, never redirects.
+const PUBLIC_PREFIXES = ["/login", "/auth", "/api"];
 
-  // For now: allow all traffic through (open skeleton)
-  return NextResponse.next();
+export async function proxy(request: NextRequest) {
+  const { supabaseResponse, supabase, user } = await updateSession(request);
+  const { pathname } = request.nextUrl;
+
+  const isPublic = PUBLIC_PREFIXES.some((prefix) =>
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+
+  if (isPublic) {
+    return supabaseResponse;
+  }
+
+  if (!user) {
+    return redirectPreservingCookies(request, "/login", supabaseResponse);
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("role, is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // No profile row yet → let the page render (empty state handled there).
+  if (!profile) return supabaseResponse;
+
+  const isAdmin = profile.is_admin || profile.role === "admin";
+  const isStaff =
+    profile.role === "coordinator" || profile.role === "professor";
+
+  if (pathname.startsWith("/admin") && !isAdmin) {
+    return redirectPreservingCookies(
+      request,
+      isStaff ? "/staff" : "/",
+      supabaseResponse
+    );
+  }
+
+  if (pathname.startsWith("/staff") && !isAdmin && !isStaff) {
+    return redirectPreservingCookies(request, "/", supabaseResponse);
+  }
+
+  return supabaseResponse;
+}
+
+function redirectPreservingCookies(
+  request: NextRequest,
+  destination: string,
+  cookieSource: NextResponse
+): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = destination;
+  url.search = "";
+  const redirect = NextResponse.redirect(url);
+  cookieSource.cookies.getAll().forEach((cookie) =>
+    redirect.cookies.set(cookie.name, cookie.value)
+  );
+  return redirect;
 }
 
 export const config = {
