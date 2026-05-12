@@ -48,8 +48,8 @@ Strategy: applying to YC Summer 2026. Mapping to RFS #2 (AI-Native Service Compa
 | AI | `@anthropic-ai/sdk` (Claude) + `openai` (Whisper) | NOT installed yet — install in Sprint 2 only |
 | Validation | `zod` | All inputs and DB writes |
 
-**Migrations applied:** 0001, 0002, 0003 (foundation: 7 tables, RLS deny-all, 24 SELECT policies, helper `is_admin()`, seed data CIDMI).
-**Coming:** 0004 (Sprint 1.5 — multi-region + bilingual + multi-currency), 0005 (Sprint 2 — class_observations, audit_logs, student_profiles).
+**Migrations applied:** 0001, 0002, 0003, 0004 (foundation: 7 tables, RLS deny-all, 24 SELECT policies, helper `is_admin()` + 9 SECURITY DEFINER helpers, seed data CIDMI; 0004 fixes RLS recursion).
+**Coming:** 0005 (Sprint 1.5 — multi-region + bilingual + multi-currency), 0006 (Sprint 2 — class_observations, audit_logs, student_profiles).
 
 ---
 
@@ -229,7 +229,9 @@ If a session is supposed to work on a specific sprint, Roberto will paste the co
 > Formato: **Regla** — *Por qué (incidente)* — *Cómo aplicarlo*.
 > Esto es lo que hace que Claude Code no repita el mismo error entre sesiones nuevas.
 
-*Sección vacía. Se va llenando con el uso real, no upfront.*
+**RLS policies con cross-table reference necesitan SECURITY DEFINER function para evitar recursion.**
+*Por qué:* 11 mayo 2026, una policy de `staff_activities` hacía SELECT contra `activities`, y la policy de `activities` hacía SELECT contra `staff_activities` → loop infinito detectado por Postgres. La query falló con `infinite recursion detected in policy for relation "staff_activities"`. Loops indirectos similares existían en `students ↔ enrollments` y `users ↔ staff_activities`. Fixed en migration 0004.
+*Cómo aplicar:* cuando una policy `USING` / `WITH CHECK` necesita verificar pertenencia cross-table, NO usar `EXISTS` / `IN (SELECT ...)` directo contra otra tabla. Extraer la lógica a una function con `language sql security definer set search_path = public stable` que retorna `setof uuid`; usar `where id in (select my_function())` en la policy. Mismo patrón que `public.is_admin()` en `0002_rls.sql`. Siempre `revoke execute from public` + `grant execute to authenticated`.
 
 ---
 
