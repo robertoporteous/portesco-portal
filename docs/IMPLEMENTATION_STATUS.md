@@ -14,23 +14,28 @@ add it **below** the snapshot or link to an internal doc.
 
 | Area                                       | Status                                         |
 | ------------------------------------------ | ---------------------------------------------- |
-| Next.js app shell, routes, layouts         | In repo                                        |
+| Next.js app shell, routes, layouts         | In repo; all three protected layouts ship with a mobile-first sticky header carrying brand + logout |
 | Types + business constants + PRD           | In repo                                        |
 | Supabase client packages in `package.json` | `@supabase/supabase-js@2.105.3` + `@supabase/ssr@0.10.2` (exact pins) |
-| SQL migrations + RLS                       | `0001_init.sql` + `0002_rls.sql` **applied** to Supabase (24 SELECT policies live, deny-all by default) |
+| SQL migrations + RLS                       | `0001_init.sql` + `0002_rls.sql` + `0003_seed.sql` + `0004_fix_rls_recursion.sql` **all applied** to Supabase; 24 SELECT policies live; 1 + 9 `SECURITY DEFINER` helpers in place |
 | Demo seed data                             | `0003_seed.sql` **applied**: CIDMI school, 4 activities, 1 admin/parent user, 1 student, 2 enrollments |
-| Magic link auth                            | UI + API stub; not calling Supabase Auth yet  |
-| Role-based route protection                | Documented; permissive in code                 |
-| Parent / staff / admin screens             | Mostly placeholders until data layer is wired  |
+| Test parent fixture                        | `supabase/scripts/seed-test-parent.sql` (idempotent, manual run from SQL Editor) — creates parent-pure `ai@portescosports.com` + 1 student + 2 enrollments for RLS isolation tests |
+| Magic link auth                            | Wired end-to-end: `/login` → `signInWithOtp` → Resend → callback → `exchangeCodeForSession` → role-based redirect; Spanish email templates configured in Supabase Dashboard |
+| Role-based route protection                | `proxy.ts` enforces session + role (`parent` → `/`, `coord`/`prof` → `/staff`, `is_admin` or `role=admin` → `/admin`); `/login`, `/auth/*`, `/api/*` public |
+| Parent / staff / admin screens             | Parent `/` is a live Server Component reading children + active enrollments + activity metadata in one nested Supabase query; staff and admin remain placeholders behind the new header until Sprint 2+ |
+| Production deploy                          | Vercel auto-deploy on push to `main`; custom domain `app.portescosports.com` with HTTPS; environment variables synced in Vercel dashboard |
+| Email delivery                             | Resend SMTP wired through Supabase Auth; sender `noreply@portescosports.com` on `send.portescosports.com` |
 | PWA icons / service worker                 | Incomplete                                     |
 
 
 ## Where to focus next (order)
 
 1. ~~Supabase project + migrations + RLS aligned with PRD.~~ **Done 2026-05-06.**
-2. Auth (magic link) + session + proxy. ← **next up**
-3. One vertical slice: parent sees real child + activities (read-only).
-4. Staff attendance → then monthly reports → billing last.
+2. ~~Auth (magic link) + session + proxy.~~ **Done 2026-05-20.**
+3. ~~One vertical slice: parent sees real child + activities (read-only).~~ **Done 2026-05-20, live on app.portescosports.com.**
+4. Sprint 1.5: multi-region + bilingual + multi-currency schema (migration 0005). ← **next up**
+5. Sprint 2: Coordinator Pad anchor + Voice→Progress Report satellite + write-side RLS (migration 0006).
+6. Staff attendance → then monthly reports → billing last.
 
 ## Note on naming
 
@@ -165,3 +170,112 @@ loudly rather than producing partial data.
 - INSERT / UPDATE / DELETE RLS policies — Sprint 2 (driven by Attendo).
 - `lib/types.ts` resync with schema (`is_admin`, `updated_at` everywhere)
   — opportunistic, expected during the first server query that needs it.
+
+## Sprint 1 Bloque 2 — closed (2026-05-20)
+
+Acceptance criteria: 11 of 11 ✅ from the original Bloque 2 prompt, validated
+end-to-end on a real iPhone Safari session against
+`https://app.portescosports.com`.
+
+### Migrations added in Bloque 2
+
+- **`0004_fix_rls_recursion.sql`** — 9 `SECURITY DEFINER` helper functions
+  (`parent_child_student_ids`, `parent_child_activity_ids`,
+  `user_school_ids_as_coordinator`, `user_activity_ids_as_professor`,
+  `user_school_ids_as_member`, `parent_kids_professor_user_ids`,
+  `coordinator_school_activity_ids`, `coordinator_school_student_ids`,
+  `professor_taught_student_ids`). Drops + recreates the 13 cross-table
+  SELECT policies so no `USING` clause still contains a raw sub-select
+  across tables. Policy count unchanged at 24. Root cause and the rule
+  this introduces are recorded in `AGENTS.md` §9.
+
+### Auth + session
+
+- `lib/supabase/{client,server,middleware}.ts` wired against
+  `@supabase/ssr@0.10.2` with the Next.js 16 async `cookies()` API.
+- `/login` is a Client Component calling `signInWithOtp` with
+  `emailRedirectTo` pointing at `/auth/callback`.
+- `/auth/callback` exchanges the PKCE code, reads `public.users.role`
+  and `is_admin`, then redirects:
+  - `is_admin` or `role='admin'` → `/admin`
+  - `role='coordinator' | 'professor'` → `/staff`
+  - `role='parent'` or no profile row → `/`
+- `proxy.ts` (Next.js 16 successor to `middleware.ts`) refreshes the
+  Supabase cookie on every request, then enforces the role rules
+  above for protected routes. `/login`, `/auth/*`, and `/api/*` are
+  public; everything else requires a session. Redirects preserve any
+  `Set-Cookie` headers from session refresh.
+- `components/shared/logout-button.tsx` is a Client Component that
+  calls `signOut()` and hard-redirects to `/login`. Wired into the
+  sticky headers of all three protected layouts so logout is reachable
+  on mobile, not only inside desktop sidebars.
+
+### Email delivery
+
+- Resend SMTP integrated through Supabase Auth (Settings → Auth → SMTP).
+- Sender domain `send.portescosports.com` with the matching SPF / DKIM
+  / DMARC records in DNS. Sender address `noreply@portescosports.com`.
+- All five Supabase email templates (magic link, signup confirmation,
+  reauthentication, recovery, invite) edited in the Dashboard to plain
+  Spanish copy.
+
+### Production deploy
+
+- Vercel project linked to the GitHub repo with auto-deploy on push to
+  `main`. Production environment variables in the Vercel dashboard
+  match `.env.local` exactly: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `NEXT_PUBLIC_APP_URL=https://app.portescosports.com`.
+- Custom domain `app.portescosports.com` via CNAME to Vercel; HTTPS
+  certificate issued automatically.
+- Supabase Authentication → URL Configuration includes
+  `https://app.portescosports.com` as Site URL and the `/auth/callback`
+  path in the Redirect Allow List so the production magic link returns
+  to the right host.
+
+### RLS isolation test (acceptance criterion #10)
+
+`supabase/scripts/seed-test-parent.sql` (idempotent, run manually from
+the Supabase SQL Editor whenever the fixture is needed):
+
+- Looks up `auth.users.id` for `ai@portescosports.com`; raises if the
+  magic-link sign-in has not happened yet for that email.
+- Upserts a `public.users` row with `role='parent'` and
+  `is_admin=false` (defensive against any prior admin flag).
+- Find-or-creates the student `Ana Mendoza`, grade 4to, CIDMI school —
+  visually distinct from Roberto admin's seed kid (`Estudiante Demo
+  Porteous`, 5to).
+- Idempotently enrolls Ana in `Basketball` + `Atletismo` (different
+  activities from Roberto's kid's `Fútbol` + `Ajedrez`) via the
+  `(student_id, activity_id)` unique constraint.
+
+End-to-end validation (Roberto, iPhone Safari, 2026-05-20):
+
+- `ai@portescosports.com` magic-link sign-in reached `/` and rendered
+  the empty state ("Aún no tienes estudiantes registrados"), confirming
+  RLS denies access by default to a fresh parent.
+- After running the seed script, the same session rendered "Hola,
+  Carolina" plus a single card for Ana Mendoza with Basketball +
+  Atletismo. The seed child of the admin (`Estudiante Demo Porteous`)
+  was **not** visible — RLS isolation confirmed.
+- Logout from `/`, `/admin`, and `/staff` (re-validated after the
+  header fix) returns to `/login`. Browser console clean.
+
+### Known limitations carried into Sprint 2+
+
+- Bottom nav on the parent layout still has placeholder links
+  (`Inicio` / `Avance` / `Calendario` / `Noticias` / `Perfil`).
+  Functional screens for Avance + Noticias arrive with the Concierge
+  surface in Sprint 2; Calendario + Perfil in Sprint 3.
+- Staff and admin sidebar nav is desktop-only (`hidden md:flex`).
+  Mobile drawer for those nav lists is Sprint 3 work; the sticky
+  header keeps logout reachable in the meantime.
+- `lib/types.ts` is still behind the schema (no `is_admin` on `User`,
+  no `updated_at` on most interfaces). Will be resynced
+  opportunistically in Sprint 2 when the first server-side write path
+  needs it.
+- `next-forge`-style i18n is not yet in place; user-facing strings live
+  inline in components. Migration 0005 introduces the bilingual schema
+  columns but the i18n runtime layer lands with Sprint 1.5 code.
+- No automated tests yet; CI is unconfigured.
+- PWA icons and service worker behavior still incomplete.
