@@ -55,13 +55,28 @@ let fixtures: Fixtures;
 const admin = adminClient();
 
 async function cleanupRlsTestRows() {
-  // Order matters because of FK restrict on students.parent_id.
-  //   1. delete bi_weekly_reports of prefixed students
-  //   2. delete prefixed students (cascades enrollments)
-  //   3. delete prefixed schools (cascades activities, sessions,
-  //      attendance, eventualities, observations, mentions, alerts)
-  //   4. delete prefixed auth users (cascades public.users + their
-  //      staff_schools / staff_activities)
+  // FK-safe teardown. NEVER assume ON DELETE CASCADE — verify each FK (AGENTS.md
+  // §9). Several FKs that look cascade-y are actually RESTRICT / NO ACTION, so
+  // children MUST be deleted before parents:
+  //   - activities.school_id         → RESTRICT  (deleting a school does NOT
+  //                                     remove its activities; this was the bug)
+  //   - enrollments.activity_id      → RESTRICT
+  //   - class_observations.author_id → NO ACTION (a surviving observation blocks
+  //                                     deleting its author user → deleteUser
+  //                                     fails silently → stale state next run)
+  // These DO cascade: class_sessions.activity_id, class_observations.session_id,
+  // and every student_id FK (enrollments, bi_weekly_reports, profile_observations).
+  //
+  // Order:
+  //   1. prefixed students → cascades their enrollments / bi_weekly_reports /
+  //      profile_observations
+  //   2. activities of prefixed schools → clear leftover enrollments (RESTRICT)
+  //      first, then delete activities → cascades sessions → observations,
+  //      attendance, eventualities (removes the author_id references)
+  //   3. class_observations still authored by the test users (defensive; should
+  //      already be 0 after step 2) — must run before deleting those users
+  //   4. prefixed schools (now childless)
+  //   5. prefixed auth users → cascades public.users + staff_schools/activities
   try {
     const { data: studentRows } = await admin
       .from('students')
@@ -76,17 +91,42 @@ async function cleanupRlsTestRows() {
     /* defensive — best effort */
   }
   try {
-    await admin.from('schools').delete().like('name', `${PREFIX}%`);
+    const { data: schoolRows } = await admin
+      .from('schools')
+      .select('id')
+      .like('name', `${PREFIX}%`);
+    const schoolIds = (schoolRows ?? []).map((r) => r.id as string);
+    if (schoolIds.length > 0) {
+      const { data: actRows } = await admin
+        .from('activities')
+        .select('id')
+        .in('school_id', schoolIds);
+      const activityIds = (actRows ?? []).map((r) => r.id as string);
+      if (activityIds.length > 0) {
+        // enrollments.activity_id is RESTRICT — clear before deleting activities.
+        await admin.from('enrollments').delete().in('activity_id', activityIds);
+        // activities → cascade class_sessions → class_observations / attendance.
+        await admin.from('activities').delete().in('id', activityIds);
+      }
+    }
   } catch {
     /* defensive */
   }
   try {
-    // List + filter + delete the auth users (no direct LIKE on auth.users via
-    // the admin API). 1000 is way more than we'd ever have at __rlstest_.
+    // List the prefixed auth users (no direct LIKE on auth.users via the admin
+    // API). 1000 is way more than we'd ever have at __rlstest_.
     const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
     const targets = (list?.users ?? []).filter((u) =>
       (u.email ?? '').startsWith(PREFIX)
     );
+    const targetIds = targets.map((u) => u.id);
+    if (targetIds.length > 0) {
+      // class_observations.author_id is NO ACTION — any leftover authored row
+      // would block deleteUser. Remove them before deleting the users.
+      await admin.from('class_observations').delete().in('author_id', targetIds);
+    }
+    // Schools are childless now (activities gone in the previous block).
+    await admin.from('schools').delete().like('name', `${PREFIX}%`);
     for (const u of targets) {
       await admin.auth.admin.deleteUser(u.id);
     }
