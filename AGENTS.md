@@ -214,10 +214,12 @@ Estas reglas son del brain file de Roberto (en su carpeta de Cowork Tech Lab). R
 
 ## 8 · Sprint context (current)
 
-**Sprint 1 Bloque 1** — ✅ closed. Foundation database (migrations 0001-0003, RLS, seed CIDMI).
-**Sprint 1 Bloque 2** — ⏳ in progress. Magic link auth + parent vertical slice + Vercel deploy. Brief at Cowork TechLab `03-herramientas/Portal/sprints/sprint-1-bloque-2-claude-code-prompt.md`.
-**Sprint 1.5** — ⏳ pending. Multi-region + bilingual + multi-currency (migration 0004).
-**Sprint 2** — ⏳ pending. Coordinator Pad v1 (anchor) + Voice→Progress Report (satellite) + 4 build adjustments (WhatsApp ingest lite, telemetry, thumbs, audit logs/PII). Migration 0005.
+**Sprint 1 Bloque 1** — ✅ closed. Foundation DB (migrations 0001-0003, RLS, seed CIDMI).
+**Sprint 1 Bloque 2** — ✅ closed (commit `857cdc5`). Magic link auth + parent vertical slice + Vercel deploy + RLS isolation verified. Migration 0004 (fix RLS recursion) aplicada.
+**Sprint 2 Bloque 1** — ✅ closed (commit `bf3eaa7`, 4 jun 2026). Migrations 0005 (audit foundation + write-side RLS) + 0006 (observations/sessions/alerts + 8 enums + 5 helpers + consecutive_absence trigger) + 0007 v2 (profile_observations NORMALIZADA + bi_weekly_reports + wa_inbox + Triple Check fix) + 0008 (fix RLS gap class_observations write scope) + seed CIDMI pilot (36 students Fútbol U14-U18) + `lib/ai/redact.ts` con 20 tests + 6 tests RLS write-side. 26/26 green.
+**Sprint 2 Bloque 2** — ⏳ next. Coordinator Pad UI dashboard + close-day + asistencia + vista sesión + script seed calendario sesiones. Sin AI todavía (eso es Bloque 3).
+**Sprint 2 Bloques 3-5** — ⏳ pending. Voice pipeline (3), reportes bi-semanales + pg_cron (4), alerts UI + WhatsApp ingest + admin quality-review + tests E2E (5).
+**Sprint 3** — ⏳ pending. Migración 0009: multi-region + bilingüe + multi-currency + parent visibility (architecture §16 deudas).
 
 If a session is supposed to work on a specific sprint, Roberto will paste the corresponding `sprint-*.md` brief. **Read that brief in full before doing anything.**
 
