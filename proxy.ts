@@ -34,10 +34,22 @@ export async function proxy(request: NextRequest) {
   if (!profile) return supabaseResponse;
 
   const isAdmin = profile.is_admin || profile.role === "admin";
+  const isCoordinator = profile.role === "coordinator";
   const isStaff =
     profile.role === "coordinator" || profile.role === "professor";
 
   if (pathname.startsWith("/admin") && !isAdmin) {
+    return redirectPreservingCookies(
+      request,
+      isStaff ? "/staff" : "/",
+      supabaseResponse
+    );
+  }
+
+  // Coordinator Pad: coordinator + admin only. Professor has its own surface
+  // (→ /staff for now); parent has none (→ /). Stricter than the generic /staff
+  // gate, which also lets professors in.
+  if (pathname.startsWith("/coordinator-pad") && !isAdmin && !isCoordinator) {
     return redirectPreservingCookies(
       request,
       isStaff ? "/staff" : "/",

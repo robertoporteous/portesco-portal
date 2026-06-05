@@ -286,4 +286,12 @@ Files in this repo:
 3. Check `tech-lab-vision-ai-native.md` for strategic context.
 4. Ask Roberto **one** clarifying question. Don't guess on architecture, schema, or anything that touches PII / auth / compliance.
 
+## 12 · Deudas técnicas abiertas (live)
+
+> Deudas conocidas que se difieren a propósito. Cada una marca el bloque/sprint donde se paga y el síntoma que la destapa. Buscá `DEBT(` en el código para los puntos exactos.
+
+- **DEBT(bloque-3): falta policy RLS `users: coordinator ve staff (professor) de su propia escuela`.**
+  *Síntoma:* un coordinator no puede leer `users.full_name` de su profesor. En Bloque 2 omitimos el nombre del profe en la card HOY del Coordinator Pad (`app/(staff)/coordinator-pad/page.tsx`, comentario `DEBT(bloque-3)`). En **Bloque 3** la sección COLA muestra "voice notes de Alexander" → ahí el nombre del profesor es obligatorio, así que la policy hay que agregarla antes de cerrar Bloque 3.
+  *Fix:* SELECT policy en `users` que deje al coordinator ver filas de staff (coordinator/professor) de sus escuelas, vía helper SECURITY DEFINER (mismo patrón que `coordinator_school_*` en 0004) para no recursar. Va en el batch RLS de Sprint 3 (migración 0009) o antes si Bloque 3 lo necesita primero.
+
 *This file is alive. Edit it when something changes. Add to "Recurring errors" after every session.*
