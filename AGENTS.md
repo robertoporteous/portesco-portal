@@ -298,4 +298,16 @@ Files in this repo:
   *Síntoma:* un coordinator no puede leer `users.full_name` de su profesor. En Bloque 2 omitimos el nombre del profe en la card HOY del Coordinator Pad (`app/(staff)/coordinator-pad/page.tsx`, comentario `DEBT(bloque-3)`). En **Bloque 3** la sección COLA muestra "voice notes de Alexander" → ahí el nombre del profesor es obligatorio, así que la policy hay que agregarla antes de cerrar Bloque 3.
   *Fix:* SELECT policy en `users` que deje al coordinator ver filas de staff (coordinator/professor) de sus escuelas, vía helper SECURITY DEFINER (mismo patrón que `coordinator_school_*` en 0004) para no recursar. Va en el batch RLS de Sprint 3 (migración 0009) o antes si Bloque 3 lo necesita primero.
 
+- **DEBT(bloque-3): el estado optimista de la vista de clase no se re-siembra desde props.** (Code review Bloque 2, hallazgo Y6.)
+  *Síntoma:* `app/(staff)/coordinator-pad/sessions/[id]/attendance-list.tsx` inicializa `statuses`/`closed`/`eventCounts` con `useState(() => …)` una sola vez. Tras `router.refresh()` o un cambio server-side, el client NO reconcilia hasta remount.
+  *Trigger:* **Bloque 3 — confirmación realtime.** Cuando el pipeline voice→AI (u otro coordinator) mute la misma sesión en vivo, el update se pierde hasta remontar. Reconciliar (sembrar desde props con el patrón de transición, o realtime subscription) ANTES de cablear el modal de confirmación realtime.
+
+- **DEBT(bloque-3): los writes no enforszan `closed_at` server-side.** (Code review Bloque 2, hallazgo Y2.)
+  *Síntoma:* `markAttendance` (`actions.ts`) no chequea que la sesión esté abierta; solo la UI deshabilita los botones. Hoy es bajo impacto (cierre soft + reabrir existe), pero es defensa-en-profundidad ausente para data de menores.
+  *Trigger:* **Bloque 3 — realtime** puede correr un write contra un cierre concurrente. Agregar guard server-side (ej. `.is('closed_at', null)` o chequeo explícito) en los writes que deban respetar el cierre. (Eventualidades siguen permitidas en cerrada — intencional.)
+
+- **DEBT(pre-launch UX): `isPending` único por componente bloquea todo el roster por tap.** (Code review Bloque 2, hallazgo Y7.)
+  *Síntoma:* en `attendance-list.tsx` un solo `useTransition` deshabilita TODOS los botones del roster mientras resuelve una marca; en conexión lenta es un lock notable. El `EventualityDrawer` deja chips/textarea editables durante el save.
+  *Trigger:* **pre-launch (UX),** o al sumar el pipeline async de Bloque 3 que quiera pending por-fila. Mover a estado de pending por-fila/acción.
+
 *This file is alive. Edit it when something changes. Add to "Recurring errors" after every session.*

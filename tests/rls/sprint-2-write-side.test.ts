@@ -283,7 +283,7 @@ beforeAll(async () => {
       school_id: schoolMain.id,
       parent_id: parentId,
       full_name: `${PREFIX}Student One`,
-      grade: 'U16',
+      grade: '9no', // real seed grade convention (maps to U16); see lib/categories
     })
     .select('id').single();
   if (e9 || !student) throw new Error(`insert student: ${e9?.message}`);

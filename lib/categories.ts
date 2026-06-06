@@ -14,5 +14,6 @@ const GRADE_TO_CATEGORY: Record<string, string> = {
 export const CATEGORY_ORDER = ["U14", "U16", "U18", "Otros"] as const;
 
 export function categoryForGrade(grade: string | null | undefined): string {
-  return (grade && GRADE_TO_CATEGORY[grade]) ?? "Otros";
+  // `||` (not `??`) so empty-string / unmapped grades also fall back to "Otros".
+  return (grade && GRADE_TO_CATEGORY[grade]) || "Otros";
 }

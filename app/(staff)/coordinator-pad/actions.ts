@@ -40,7 +40,10 @@ export async function markAttendance(input: {
 
   if (error) return { ok: false, error: error.message };
 
+  // Also revalidate the dashboard: its "Cerrar día" warning reads attendance
+  // counts per session, which this write changes.
   revalidatePath(`/coordinator-pad/sessions/${input.sessionId}`);
+  revalidatePath("/coordinator-pad");
   return { ok: true };
 }
 
@@ -86,6 +89,7 @@ export async function addEventuality(input: {
   if (error) return { ok: false, error: error.message };
 
   revalidatePath(`/coordinator-pad/sessions/${input.sessionId}`);
+  revalidatePath("/coordinator-pad");
   return { ok: true };
 }
 

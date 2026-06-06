@@ -1,17 +1,20 @@
 // Auth gate for /coordinator-pad — negative-case regression guard.
 //
-// What this proves (acceptance matrix, decision #6):
+// What this proves (decision #6), for the pad ROOT *and* a nested sub-route
+// (/coordinator-pad/sessions/<id>, the roster page that renders minors' names):
 //   parent      → redirect to "/"
 //   professor   → redirect to "/staff"
 //   coordinator → allowed (no redirect)
 //   admin       → allowed (no redirect)
+// The sub-route case pins the proxy's `startsWith("/coordinator-pad")` gate so a
+// future refactor to exact-path matching can't silently de-protect nested pages.
 //
 // How: we import the REAL `proxy` (proxy.ts, the edge gate) and call it with a
 // genuine Supabase auth cookie for each role — the same cookie @supabase/ssr
 // would set in the browser, minted here via generateLink + verifyOtp through an
 // in-memory cookie jar. proxy.ts is what emits the observable redirect; the
-// layout.tsx guard is the redundant second line behind it (defense in depth),
-// so the proxy result fully captures the matrix. No dev server needed.
+// layout.tsx guard is the redundant second line behind it (defense in depth).
+// This covers the proxy edge gate only (not the layout guard). No dev server.
 //
 // Fixtures use the dedicated sub-prefix __rlstest_gate_ (isolated from the
 // RLS write-side suite's __rlstest_ users) and dedicated test auth users —
@@ -118,11 +121,24 @@ async function cleanup() {
   }
 }
 
-// Run the request for `email` through the real proxy; return the observable
-// redirect (status + Location pathname), or location=null when allowed through.
-async function gateFor(email: string) {
-  const cookies = await sessionCookiesFor(email);
-  const request = new NextRequest('http://localhost/coordinator-pad');
+// Cache the auth cookies per role so calling gateFor for multiple paths doesn't
+// re-mint a session each time (Supabase rate-limits verifyOtp — AGENTS.md §9).
+const cookieCache = new Map<string, { name: string; value: string }[]>();
+async function cookiesFor(email: string) {
+  let cookies = cookieCache.get(email);
+  if (!cookies) {
+    cookies = await sessionCookiesFor(email);
+    cookieCache.set(email, cookies);
+  }
+  return cookies;
+}
+
+// Run a request for `email` at `path` through the real proxy; return the
+// observable redirect (status + Location pathname), or location=null when
+// allowed through.
+async function gateFor(email: string, path = '/coordinator-pad') {
+  const cookies = await cookiesFor(email);
+  const request = new NextRequest(`http://localhost${path}`);
   for (const { name, value } of cookies) {
     request.cookies.set(name, value);
   }
@@ -143,27 +159,39 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  cookieCache.clear();
   await cleanup();
 });
 
-describe('/coordinator-pad auth gate (proxy.ts)', () => {
+// Run the full role matrix against the pad root AND a nested session sub-route.
+// The proxy doesn't validate the session id (it only gates by path prefix +
+// role), so a dummy id is enough to exercise the sub-route.
+const PATHS = [
+  { label: 'root', path: '/coordinator-pad' },
+  {
+    label: 'session sub-route',
+    path: '/coordinator-pad/sessions/00000000-0000-0000-0000-000000000000',
+  },
+];
+
+describe.each(PATHS)('/coordinator-pad auth gate (proxy.ts) — $label', ({ path }) => {
   it('parent → redirected to /', async () => {
-    const { pathname } = await gateFor(EMAILS.parent);
+    const { pathname } = await gateFor(EMAILS.parent, path);
     expect(pathname).toBe('/');
   });
 
   it('professor → redirected to /staff', async () => {
-    const { pathname } = await gateFor(EMAILS.professor);
+    const { pathname } = await gateFor(EMAILS.professor, path);
     expect(pathname).toBe('/staff');
   });
 
   it('coordinator → allowed through (no redirect)', async () => {
-    const { pathname } = await gateFor(EMAILS.coordinator);
+    const { pathname } = await gateFor(EMAILS.coordinator, path);
     expect(pathname).toBeNull();
   });
 
   it('admin → allowed through (no redirect)', async () => {
-    const { pathname } = await gateFor(EMAILS.admin);
+    const { pathname } = await gateFor(EMAILS.admin, path);
     expect(pathname).toBeNull();
   });
 });
