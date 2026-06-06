@@ -43,6 +43,51 @@ export async function markAttendance(input: {
   return { ok: true };
 }
 
+// Eventuality types surfaced as chips (PRD §4.2). The enum also has
+// 'tarea_pendiente' but it isn't a chip in this slice.
+export type EventualityType =
+  | "lesion"
+  | "retiro_temprano"
+  | "conflicto"
+  | "comportamiento"
+  | "tarde"
+  | "otro";
+
+export type EventualitySeverity = "info" | "attention" | "urgent";
+
+// Records a per-kid eventuality. Append-only INSERT (no update path). RLS
+// (class_eventualities "coordinator session") only allows it for sessions of
+// the coordinator's own school. Allowed even on a closed session — incidents
+// (e.g. injuries) are sometimes reported late and must not be blocked.
+export async function addEventuality(input: {
+  sessionId: string;
+  studentId: string;
+  type: EventualityType;
+  severity: EventualitySeverity;
+  notes?: string | null;
+}): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+
+  const { error } = await supabase.from("class_eventualities").insert({
+    session_id: input.sessionId,
+    student_id: input.studentId,
+    type: input.type,
+    severity: input.severity,
+    notes: input.notes?.trim() || null,
+    created_by: user.id,
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/coordinator-pad/sessions/${input.sessionId}`);
+  return { ok: true };
+}
+
 // Soft close: stamp closed_at/closed_by. Completion ratio is derived post-hoc
 // from class_attendance vs enrollments + timestamps — no "missing count" column.
 export async function closeClass(sessionId: string): Promise<ActionResult> {

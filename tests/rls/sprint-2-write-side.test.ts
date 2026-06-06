@@ -449,3 +449,52 @@ describe('Sprint 2 RLS — class_attendance UPSERT (coordinator)', () => {
     expect(rows ?? []).toEqual([]);
   });
 });
+
+// Mirrors the addEventuality Server Action: append-only INSERT through an
+// RLS-respecting client signed in as the coordinator.
+async function insertEventuality(
+  client: SupabaseClient,
+  sessionId: string,
+  studentId: string,
+  createdBy: string,
+) {
+  return client
+    .from('class_eventualities')
+    .insert({
+      session_id: sessionId,
+      student_id: studentId,
+      type: 'lesion',
+      severity: 'info',
+      notes: '__rlstest_ eventuality',
+      created_by: createdBy,
+    })
+    .select('id, created_by')
+    .single();
+}
+
+describe('Sprint 2 RLS — class_eventualities INSERT (coordinator)', () => {
+  it('10. coordinator CAN insert an eventuality in a session of own school', async () => {
+    const client = await signInAsUser(COORD_EMAIL);
+    const { data, error } = await insertEventuality(
+      client, fixtures.sessionMainId, fixtures.studentId, fixtures.coordId,
+    );
+    expect(error).toBeNull();
+    expect(data?.id).toBeTruthy();
+    expect(data?.created_by).toBe(fixtures.coordId);
+  });
+
+  it('11. coordinator CANNOT insert an eventuality in another school\'s session', async () => {
+    const client = await signInAsUser(COORD_EMAIL);
+    const { data, error } = await insertEventuality(
+      client, fixtures.sessionOtherId, fixtures.studentId, fixtures.coordId,
+    );
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
+
+    const { data: rows } = await admin
+      .from('class_eventualities')
+      .select('id')
+      .eq('session_id', fixtures.sessionOtherId);
+    expect(rows ?? []).toEqual([]);
+  });
+});

@@ -32,18 +32,23 @@ export default async function SessionPage({
     Array.isArray(session.activities) ? session.activities[0] : session.activities
   ) as { id: string; name: string };
 
-  // Enrolled kids + existing attendance for this session (in parallel).
-  const [{ data: enrollmentRows }, { data: attendanceRows }] = await Promise.all([
-    supabase
-      .from("enrollments")
-      .select("student:students!inner(id, full_name, grade)")
-      .eq("activity_id", activity.id)
-      .eq("status", "active"),
-    supabase
-      .from("class_attendance")
-      .select("student_id, status")
-      .eq("session_id", id),
-  ]);
+  // Enrolled kids + existing attendance + existing eventualities (in parallel).
+  const [{ data: enrollmentRows }, { data: attendanceRows }, { data: eventualityRows }] =
+    await Promise.all([
+      supabase
+        .from("enrollments")
+        .select("student:students!inner(id, full_name, grade)")
+        .eq("activity_id", activity.id)
+        .eq("status", "active"),
+      supabase
+        .from("class_attendance")
+        .select("student_id, status")
+        .eq("session_id", id),
+      supabase
+        .from("class_eventualities")
+        .select("student_id")
+        .eq("session_id", id),
+    ]);
 
   const statusByStudent = new Map<string, AttendanceStatus>(
     (attendanceRows ?? []).map((a) => [
@@ -51,6 +56,13 @@ export default async function SessionPage({
       a.status as AttendanceStatus,
     ])
   );
+
+  // Count eventualities per kid for the badge.
+  const eventualityCount = new Map<string, number>();
+  for (const row of eventualityRows ?? []) {
+    const sid = row.student_id as string | null;
+    if (sid) eventualityCount.set(sid, (eventualityCount.get(sid) ?? 0) + 1);
+  }
 
   // Normalize the enrollments embed (student is to-one, typed as array).
   const kids: Kid[] = (enrollmentRows ?? []).map((row) => {
@@ -63,6 +75,7 @@ export default async function SessionPage({
       id: s.id,
       fullName: s.full_name,
       status: statusByStudent.get(s.id) ?? null,
+      eventualities: eventualityCount.get(s.id) ?? 0,
     };
   });
 
