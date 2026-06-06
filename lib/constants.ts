@@ -57,19 +57,21 @@ export const EVENT_TYPE_CONFIG = {
   deadline: { label: "Fecha límite", color: "#EF4444" },
 } as const;
 
-// Attendance status labels
+// Attendance status labels — keys mirror the attendance_status enum (0006).
 export const ATTENDANCE_LABELS = {
   present: "Presente",
   absent: "Ausente",
-  excused: "Excusado",
+  justified: "Justificado",
   late: "Tarde",
+  not_marked: "Sin marcar",
 } as const;
 
 export const ATTENDANCE_COLORS = {
   present: "#10B981",
   absent: "#EF4444",
-  excused: "#F59E0B",
+  justified: "#F59E0B",
   late: "#F97316",
+  not_marked: "#9CA3AF",
 } as const;
 
 // Payment config

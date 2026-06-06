@@ -6,7 +6,13 @@ export type ActivityCategory = "deporte" | "arte" | "academico" | "cuidado";
 
 export type EnrollmentStatus = "active" | "trial" | "withdrawn" | "suspended";
 
-export type AttendanceStatus = "present" | "absent" | "excused" | "late";
+// Mirrors the Postgres enum attendance_status (migration 0006).
+export type AttendanceStatus =
+  | "present"
+  | "absent"
+  | "justified"
+  | "late"
+  | "not_marked";
 
 export type OverallRating =
   | "excelente"
@@ -109,13 +115,18 @@ export interface Enrollment {
   withdrawn_at: string | null;
 }
 
+// Mirrors the class_attendance table (migration 0006): one row per
+// (session_id, student_id), upserted when a coordinator marks attendance.
 export interface Attendance {
   id: string;
-  enrollment_id: string;
-  session_date: string;
+  session_id: string;
+  student_id: string;
   status: AttendanceStatus;
-  marked_by: string;
+  marked_at: string | null;
+  marked_by: string | null;
+  notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface MetricValues {

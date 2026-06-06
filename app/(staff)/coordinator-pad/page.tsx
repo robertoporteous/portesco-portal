@@ -1,7 +1,9 @@
+import Link from "next/link";
 import {
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  ChevronRight,
   ClipboardList,
 } from "lucide-react";
 
@@ -103,9 +105,10 @@ export default async function CoordinatorPadPage() {
                 const startAt = new Date(s.scheduled_start_at);
                 const count = s.activities.enrollments?.[0]?.count ?? 0;
                 return (
-                  <div
+                  <Link
                     key={s.id}
-                    className="flex items-start gap-2.5 rounded-lg border border-gray-100 p-3"
+                    href={`/coordinator-pad/sessions/${s.id}`}
+                    className="flex items-start gap-2.5 rounded-lg border border-gray-100 p-3 transition-colors hover:bg-gray-50"
                   >
                     <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[color:var(--portesco-gray-mid)]" />
                     <div className="min-w-0 flex-1">
@@ -123,7 +126,8 @@ export default async function CoordinatorPadPage() {
                       </p>
                     </div>
                     <Badge variant="secondary">NO iniciada</Badge>
-                  </div>
+                    <ChevronRight className="mt-0.5 size-4 shrink-0 text-[color:var(--portesco-gray-mid)]" />
+                  </Link>
                 );
               })
             ) : (

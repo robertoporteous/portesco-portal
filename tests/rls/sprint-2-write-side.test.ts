@@ -379,3 +379,73 @@ describe('Sprint 2 RLS — bi_weekly_reports SELECT', () => {
     expect((data ?? []).length).toBeGreaterThanOrEqual(1);
   });
 });
+
+// Mirrors what the markAttendance Server Action does, through an RLS-respecting
+// client signed in as the coordinator (NOT service_role).
+async function upsertAttendance(
+  client: SupabaseClient,
+  sessionId: string,
+  studentId: string,
+  status: 'present' | 'absent' | 'justified',
+  markedBy: string,
+) {
+  return client
+    .from('class_attendance')
+    .upsert(
+      {
+        session_id: sessionId,
+        student_id: studentId,
+        status,
+        marked_by: markedBy,
+        marked_at: new Date().toISOString(),
+      },
+      { onConflict: 'session_id,student_id' },
+    )
+    .select('id, status, marked_by')
+    .single();
+}
+
+describe('Sprint 2 RLS — class_attendance UPSERT (coordinator)', () => {
+  it('7. coordinator CAN upsert attendance in a session of own school', async () => {
+    const client = await signInAsUser(COORD_EMAIL);
+    const { data, error } = await upsertAttendance(
+      client, fixtures.sessionMainId, fixtures.studentId, 'present', fixtures.coordId,
+    );
+    expect(error).toBeNull();
+    expect(data?.status).toBe('present');
+    expect(data?.marked_by).toBe(fixtures.coordId);
+  });
+
+  it('8. re-upsert updates the same row (on conflict session_id,student_id)', async () => {
+    const client = await signInAsUser(COORD_EMAIL);
+    const { error } = await upsertAttendance(
+      client, fixtures.sessionMainId, fixtures.studentId, 'absent', fixtures.coordId,
+    );
+    expect(error).toBeNull();
+
+    // Exactly one row for this (session, student), now 'absent'.
+    const { data: rows } = await admin
+      .from('class_attendance')
+      .select('id, status')
+      .eq('session_id', fixtures.sessionMainId)
+      .eq('student_id', fixtures.studentId);
+    expect(rows?.length).toBe(1);
+    expect(rows?.[0]?.status).toBe('absent');
+  });
+
+  it('9. coordinator CANNOT upsert attendance in another school\'s session', async () => {
+    const client = await signInAsUser(COORD_EMAIL);
+    const { data, error } = await upsertAttendance(
+      client, fixtures.sessionOtherId, fixtures.studentId, 'present', fixtures.coordId,
+    );
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
+
+    // And nothing leaked into the other school's session.
+    const { data: rows } = await admin
+      .from('class_attendance')
+      .select('id')
+      .eq('session_id', fixtures.sessionOtherId);
+    expect(rows ?? []).toEqual([]);
+  });
+});

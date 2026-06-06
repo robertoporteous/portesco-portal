@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { Toaster } from "@/components/ui/sonner";
 
 // Coordinator Pad auth gate — second line of defense (AGENTS.md §3.4, "RLS as
 // first line, server action/app as second"). proxy.ts already redirects wrong
@@ -32,5 +33,10 @@ export default async function CoordinatorPadLayout({
 
   if (!allowed) redirect("/");
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Toaster />
+    </>
+  );
 }
