@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { panamaTodayRange } from "@/lib/dates";
 
 // Statuses a coordinator can set from the class view (Presente/Ausente/Justificado).
 // 'late' / 'not_marked' exist in the enum but aren't surfaced as buttons in slice 1.
@@ -106,6 +107,55 @@ export async function closeClass(sessionId: string): Promise<ActionResult> {
   if (error) return { ok: false, error: error.message };
 
   revalidatePath(`/coordinator-pad/sessions/${sessionId}`);
+  revalidatePath("/coordinator-pad");
+  return { ok: true };
+}
+
+// Reopen a closed session to correct it. RLS limits the UPDATE to sessions of
+// the coordinator's own school.
+export async function reopenClass(sessionId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+
+  const { error } = await supabase
+    .from("class_sessions")
+    .update({ closed_at: null, closed_by: null })
+    .eq("id", sessionId);
+
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath(`/coordinator-pad/sessions/${sessionId}`);
+  revalidatePath("/coordinator-pad");
+  return { ok: true };
+}
+
+// Close every still-open session of TODAY (Panama) in one tap. Scope is two
+// layers: the scheduled_start_at range pins it to today, and RLS (class_sessions
+// "coordinator school") pins it to the coordinator's own school — sessions of
+// another school, or of another day, are never touched.
+export async function closeDay(): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+
+  const { start, end } = panamaTodayRange();
+
+  const { error } = await supabase
+    .from("class_sessions")
+    .update({ closed_at: new Date().toISOString(), closed_by: user.id })
+    .gte("scheduled_start_at", start.toISOString())
+    .lt("scheduled_start_at", end.toISOString())
+    .is("closed_at", null);
+
+  if (error) return { ok: false, error: error.message };
+
   revalidatePath("/coordinator-pad");
   return { ok: true };
 }

@@ -26,6 +26,7 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { adminClient, signInAsUser } from '../_helpers/supabase';
+import { panamaTodayRange } from '@/lib/dates';
 
 const PREFIX = '__rlstest_';
 const COORD_EMAIL  = `${PREFIX}coord@portesco-test.com`;
@@ -46,6 +47,7 @@ type Fixtures = {
   sessionMainId: string;
   sessionMainOtherId: string;
   sessionOtherId: string;
+  sessionMainPastId: string;
   studentId: string;
   reportId: string;
 };
@@ -53,6 +55,19 @@ type Fixtures = {
 let fixtures: Fixtures;
 
 const admin = adminClient();
+
+// Cache one signed-in client per role. signInAsUser mints a magic link +
+// verifyOtp, and Supabase rate-limits the verify endpoint; signing in once per
+// role (not once per test) keeps `npm test` repeatable across consecutive runs.
+const clientByEmail = new Map<string, SupabaseClient>();
+async function getClient(email: string): Promise<SupabaseClient> {
+  let client = clientByEmail.get(email);
+  if (!client) {
+    client = await signInAsUser(email);
+    clientByEmail.set(email, client);
+  }
+  return client;
+}
 
 async function cleanupRlsTestRows() {
   // FK-safe teardown. NEVER assume ON DELETE CASCADE — verify each FK (AGENTS.md
@@ -246,6 +261,20 @@ beforeAll(async () => {
     sessions.map((s) => [s.activity_id as string, s.id as string])
   );
 
+  // A past-dated open session in school A (activityMain), OUTSIDE today's Panama
+  // range — used to prove closeDay's date filter only closes today's sessions.
+  const pastStart = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  const pastEnd = new Date(pastStart.getTime() + 60 * 60 * 1000);
+  const { data: pastSession, error: e8b } = await admin
+    .from('class_sessions')
+    .insert({
+      activity_id: aMain.id,
+      scheduled_start_at: pastStart.toISOString(),
+      scheduled_end_at: pastEnd.toISOString(),
+    })
+    .select('id').single();
+  if (e8b || !pastSession) throw new Error(`insert past session: ${e8b?.message}`);
+
   // --- Student + enrollment + report ---------------------------------------
 
   const { data: student, error: e9 } = await admin
@@ -293,12 +322,14 @@ beforeAll(async () => {
     sessionMainId:      sessionByActivity.get(aMain.id)!,
     sessionMainOtherId: sessionByActivity.get(aMainOther.id)!,
     sessionOtherId:     sessionByActivity.get(aOther.id)!,
+    sessionMainPastId:  pastSession.id,
     studentId:          student.id,
     reportId:           report.id,
   };
 });
 
 afterAll(async () => {
+  clientByEmail.clear();
   await cleanupRlsTestRows();
 });
 
@@ -320,7 +351,7 @@ async function tryInsertObservation(
 
 describe('Sprint 2 RLS — class_observations INSERT (coordinator)', () => {
   it('1. coordinator CAN insert into a session of own school', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await tryInsertObservation(
       client, fixtures.sessionMainId, fixtures.coordId,
     );
@@ -329,7 +360,7 @@ describe('Sprint 2 RLS — class_observations INSERT (coordinator)', () => {
   });
 
   it('2. coordinator CANNOT insert into a session of another school', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await tryInsertObservation(
       client, fixtures.sessionOtherId, fixtures.coordId,
     );
@@ -340,7 +371,7 @@ describe('Sprint 2 RLS — class_observations INSERT (coordinator)', () => {
 
 describe('Sprint 2 RLS — class_observations INSERT (professor)', () => {
   it('3. professor CAN insert into a session of their own activity', async () => {
-    const client = await signInAsUser(PROF_EMAIL);
+    const client = await getClient(PROF_EMAIL);
     const { data, error } = await tryInsertObservation(
       client, fixtures.sessionMainId, fixtures.profId,
     );
@@ -349,7 +380,7 @@ describe('Sprint 2 RLS — class_observations INSERT (professor)', () => {
   });
 
   it('4. professor CANNOT insert into a session of another activity', async () => {
-    const client = await signInAsUser(PROF_EMAIL);
+    const client = await getClient(PROF_EMAIL);
     const { data, error } = await tryInsertObservation(
       client, fixtures.sessionMainOtherId, fixtures.profId,
     );
@@ -360,7 +391,7 @@ describe('Sprint 2 RLS — class_observations INSERT (professor)', () => {
 
 describe('Sprint 2 RLS — bi_weekly_reports SELECT', () => {
   it('5. parent gets 0 rows (no parent policy in Sprint 2)', async () => {
-    const client = await signInAsUser(PARENT_EMAIL);
+    const client = await getClient(PARENT_EMAIL);
     const { data, error } = await client
       .from('bi_weekly_reports')
       .select('id')
@@ -370,7 +401,7 @@ describe('Sprint 2 RLS — bi_weekly_reports SELECT', () => {
   });
 
   it('6. admin sees the report (>=1 rows, no error)', async () => {
-    const client = await signInAsUser(ADMIN_EMAIL);
+    const client = await getClient(ADMIN_EMAIL);
     const { data, error } = await client
       .from('bi_weekly_reports')
       .select('id')
@@ -407,7 +438,7 @@ async function upsertAttendance(
 
 describe('Sprint 2 RLS — class_attendance UPSERT (coordinator)', () => {
   it('7. coordinator CAN upsert attendance in a session of own school', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await upsertAttendance(
       client, fixtures.sessionMainId, fixtures.studentId, 'present', fixtures.coordId,
     );
@@ -417,7 +448,7 @@ describe('Sprint 2 RLS — class_attendance UPSERT (coordinator)', () => {
   });
 
   it('8. re-upsert updates the same row (on conflict session_id,student_id)', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { error } = await upsertAttendance(
       client, fixtures.sessionMainId, fixtures.studentId, 'absent', fixtures.coordId,
     );
@@ -434,7 +465,7 @@ describe('Sprint 2 RLS — class_attendance UPSERT (coordinator)', () => {
   });
 
   it('9. coordinator CANNOT upsert attendance in another school\'s session', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await upsertAttendance(
       client, fixtures.sessionOtherId, fixtures.studentId, 'present', fixtures.coordId,
     );
@@ -474,7 +505,7 @@ async function insertEventuality(
 
 describe('Sprint 2 RLS — class_eventualities INSERT (coordinator)', () => {
   it('10. coordinator CAN insert an eventuality in a session of own school', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await insertEventuality(
       client, fixtures.sessionMainId, fixtures.studentId, fixtures.coordId,
     );
@@ -484,7 +515,7 @@ describe('Sprint 2 RLS — class_eventualities INSERT (coordinator)', () => {
   });
 
   it('11. coordinator CANNOT insert an eventuality in another school\'s session', async () => {
-    const client = await signInAsUser(COORD_EMAIL);
+    const client = await getClient(COORD_EMAIL);
     const { data, error } = await insertEventuality(
       client, fixtures.sessionOtherId, fixtures.studentId, fixtures.coordId,
     );
@@ -496,5 +527,80 @@ describe('Sprint 2 RLS — class_eventualities INSERT (coordinator)', () => {
       .select('id')
       .eq('session_id', fixtures.sessionOtherId);
     expect(rows ?? []).toEqual([]);
+  });
+});
+
+describe('Sprint 2 RLS — reopenClass (coordinator)', () => {
+  it('12. coordinator reopens own closed session (closed_at back to null)', async () => {
+    const client = await getClient(COORD_EMAIL);
+
+    // Close it first (as the coordinator).
+    const close = await client
+      .from('class_sessions')
+      .update({ closed_at: new Date().toISOString(), closed_by: fixtures.coordId })
+      .eq('id', fixtures.sessionMainId)
+      .select('id')
+      .single();
+    expect(close.error).toBeNull();
+
+    // Reopen.
+    const reopen = await client
+      .from('class_sessions')
+      .update({ closed_at: null, closed_by: null })
+      .eq('id', fixtures.sessionMainId)
+      .select('id, closed_at')
+      .single();
+    expect(reopen.error).toBeNull();
+    expect(reopen.data?.closed_at).toBeNull();
+  });
+});
+
+describe('Sprint 2 RLS — closeDay (coordinator, date + school scoped)', () => {
+  it('13. closes today\'s open sessions of own school only — not other school, not other days', async () => {
+    const client = await getClient(COORD_EMAIL);
+
+    // Make sure the three sessions under test start OPEN.
+    await admin
+      .from('class_sessions')
+      .update({ closed_at: null, closed_by: null })
+      .in('id', [
+        fixtures.sessionMainId,
+        fixtures.sessionOtherId,
+        fixtures.sessionMainPastId,
+      ]);
+
+    // The exact operation closeDay performs: update today's open sessions.
+    const { start, end } = panamaTodayRange();
+    const { error } = await client
+      .from('class_sessions')
+      .update({ closed_at: new Date().toISOString(), closed_by: fixtures.coordId })
+      .gte('scheduled_start_at', start.toISOString())
+      .lt('scheduled_start_at', end.toISOString())
+      .is('closed_at', null);
+    expect(error).toBeNull();
+
+    // 1. today + own school (A) → CLOSED.
+    const { data: a } = await admin
+      .from('class_sessions')
+      .select('closed_at')
+      .eq('id', fixtures.sessionMainId)
+      .single();
+    expect(a?.closed_at).not.toBeNull();
+
+    // 2. today + other school (B) → UNTOUCHED (blocked by RLS).
+    const { data: b } = await admin
+      .from('class_sessions')
+      .select('closed_at')
+      .eq('id', fixtures.sessionOtherId)
+      .single();
+    expect(b?.closed_at).toBeNull();
+
+    // 3. other day + own school (A) → UNTOUCHED (date filter scopes to today).
+    const { data: c } = await admin
+      .from('class_sessions')
+      .select('closed_at')
+      .eq('id', fixtures.sessionMainPastId)
+      .single();
+    expect(c?.closed_at).toBeNull();
   });
 });

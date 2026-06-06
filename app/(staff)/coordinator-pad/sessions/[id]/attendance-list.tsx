@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   closeClass,
   markAttendance,
+  reopenClass,
   type MarkableStatus,
 } from "../../actions";
 import { EventualityDrawer } from "./eventuality-drawer";
@@ -66,6 +67,7 @@ export function AttendanceList({
   const [isPending, startTransition] = useTransition();
   const [closed, setClosed] = useState(initiallyClosed);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
 
   // Source of truth for the rendered status of every kid (optimistic).
   const [statuses, setStatuses] = useState<Record<string, AttendanceStatus | null>>(
@@ -116,6 +118,19 @@ export function AttendanceList({
     } else {
       doClose();
     }
+  }
+
+  function doReopen() {
+    setReopenOpen(false);
+    startTransition(async () => {
+      const result = await reopenClass(sessionId);
+      if (!result.ok) {
+        toast.error("No se pudo reabrir la clase");
+        return;
+      }
+      setClosed(false);
+      toast.success("Clase reabierta");
+    });
   }
 
   return (
@@ -194,18 +209,28 @@ export function AttendanceList({
         ))}
       </div>
 
-      {/* Sticky bottom — soft close */}
+      {/* Sticky bottom — soft close, or reopen when already closed */}
       <div className="sticky bottom-0 border-t border-gray-100 bg-white px-4 py-3">
-        <Button
-          className="w-full"
-          size="lg"
-          disabled={closed || isPending}
-          onClick={onCloseClick}
-        >
-          {closed
-            ? "Clase cerrada"
-            : `Cerrar clase (${markedCount}/${totalKids})`}
-        </Button>
+        {closed ? (
+          <Button
+            className="w-full"
+            size="lg"
+            variant="outline"
+            disabled={isPending}
+            onClick={() => setReopenOpen(true)}
+          >
+            Reabrir clase
+          </Button>
+        ) : (
+          <Button
+            className="w-full"
+            size="lg"
+            disabled={isPending}
+            onClick={onCloseClick}
+          >
+            Cerrar clase ({markedCount}/{totalKids})
+          </Button>
+        )}
       </div>
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -222,6 +247,21 @@ export function AttendanceList({
           <AlertDialogFooter>
             <AlertDialogCancel>Volver</AlertDialogCancel>
             <AlertDialogAction onClick={doClose}>Cerrar igual</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={reopenOpen} onOpenChange={setReopenOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Reabrir la clase?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a poder volver a marcar asistencia y cerrarla de nuevo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Volver</AlertDialogCancel>
+            <AlertDialogAction onClick={doReopen}>Reabrir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

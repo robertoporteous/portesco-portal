@@ -8,9 +8,9 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptySection } from "@/components/shared/empty-section";
+import { CloseDayBar } from "./close-day-bar";
 import { createClient } from "@/lib/supabase/server";
 import {
   formatPanamaDate,
@@ -25,10 +25,12 @@ type TodaySession = {
   id: string;
   scheduled_start_at: string;
   scheduled_end_at: string;
+  closed_at: string | null;
   activities: {
     name: string;
     enrollments: { count: number }[];
   };
+  class_attendance: { count: number }[];
 };
 
 export default async function CoordinatorPadPage() {
@@ -57,7 +59,7 @@ export default async function CoordinatorPadPage() {
   const { data: todayRows } = await supabase
     .from("class_sessions")
     .select(
-      "id, scheduled_start_at, scheduled_end_at, activities!inner(name, enrollments(count))"
+      "id, scheduled_start_at, scheduled_end_at, closed_at, activities!inner(name, enrollments(count)), class_attendance(count)"
     )
     .gte("scheduled_start_at", start.toISOString())
     .lt("scheduled_start_at", end.toISOString())
@@ -78,8 +80,17 @@ export default async function CoordinatorPadPage() {
     nextSessionAt = next?.scheduled_start_at ?? null;
   }
 
+  // Close-day stats: Y = today's sessions, X = closed, plus whether any still-open
+  // session has incomplete attendance (attended < enrolled) for the soft warning.
   const total = sessions.length;
-  const closed = 0; // Real close is a Server Action in Paso 5.
+  const closedCount = sessions.filter((s) => s.closed_at !== null).length;
+  const openCount = total - closedCount;
+  const anyOpenIncomplete = sessions.some((s) => {
+    if (s.closed_at !== null) return false;
+    const enrolled = s.activities.enrollments?.[0]?.count ?? 0;
+    const attended = s.class_attendance?.[0]?.count ?? 0;
+    return attended < enrolled;
+  });
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md flex-col">
@@ -125,7 +136,9 @@ export default async function CoordinatorPadPage() {
                         {count} enrolled
                       </p>
                     </div>
-                    <Badge variant="secondary">NO iniciada</Badge>
+                    <Badge variant="secondary">
+                      {s.closed_at ? "Cerrada" : "NO iniciada"}
+                    </Badge>
                     <ChevronRight className="mt-0.5 size-4 shrink-0 text-[color:var(--portesco-gray-mid)]" />
                   </Link>
                 );
@@ -167,13 +180,13 @@ export default async function CoordinatorPadPage() {
         </Card>
       </div>
 
-      {/* Sticky bottom — visual only; real close is a Server Action (Paso 5).
-          Disabled when there are no sessions today. */}
-      <div className="sticky bottom-0 border-t border-gray-100 bg-white px-4 py-3">
-        <Button className="w-full" size="lg" disabled={total === 0}>
-          Cerrar día ({closed}/{total} clases)
-        </Button>
-      </div>
+      {/* Sticky bottom — close every open session of today in one tap. */}
+      <CloseDayBar
+        total={total}
+        closed={closedCount}
+        openCount={openCount}
+        anyOpenIncomplete={anyOpenIncomplete}
+      />
     </div>
   );
 }
