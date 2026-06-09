@@ -16,6 +16,15 @@ import { cn } from "@/lib/utils";
 //  - El codec lo elige el browser (Safari iOS → audio/mp4 AAC; Chrome → webm).
 //    No forzamos mimeType; leemos recorder.mimeType real y derivamos el ext.
 //  - Path convention futura: voice-obs/{author_id}/{observation_id}.{ext}.
+//
+// Hallazgo del spike (validado iPhone Safari iOS, 8 jun 2026, admin):
+//  - MIME real iOS = audio/mp4; codecs=mp4a.40.2 → ext .m4a.
+//  - El recorder SOBREVIVE al bloqueo/dimeo de pantalla (estado "recording" al
+//    volver, nunca "inactive") → tap/tap + lock-survive confirmados en device.
+//  - Peso ≈ 1.35 MB/min (AAC). HARD CAP de grabación = 8 min (Tarea 6) →
+//    ~10.8 MB worst case. Por eso el bucket voice-obs se subió a 15 MB en
+//    Supabase Studio (cero código). El cap de 8 min sigue válido contra 15 MB.
+//    TODO(Tarea 6): enforce el hard cap de 8 min en el recorder productivo.
 
 // MIME real (sin el parámetro ;codecs=...) → extensión de archivo para el path.
 // El bucket voice-obs whitelistea audio/webm, audio/mp4, audio/mpeg.
