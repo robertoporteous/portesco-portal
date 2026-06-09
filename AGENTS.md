@@ -117,7 +117,13 @@ If you write a code path that calls Claude or Whisper without writing to `audit_
 
 ### 3.4 PII redaction (Sprint 2 ajuste 4)
 
-Before any prompt to Claude/Whisper, redact: full names of minors, parent emails, parent phones, exact addresses, school IDs that map to a single school. Replace with placeholders `[STUDENT_1]`, `[PARENT_EMAIL]`, etc. Keep mapping in memory, restore in output. Never log raw PII.
+Before any **text** prompt to Claude (or any other text LLM), redact: full names of minors, parent emails, parent phones, exact addresses, school IDs that map to a single school. Replace with placeholders `[STUDENT_1]`, `[PARENT_EMAIL]`, etc. Keep mapping in memory, restore in output. Never log raw PII.
+
+**Carve-out ANGOSTO — transcripción de voz (Whisper) es la ÚNICA excepción a "redact antes del LLM".** *(decisión Roberto, 8 jun 2026)*
+El audio de un voice note contiene PII de menores por naturaleza física: es habla con nombres reales, y no se puede redactar un audio antes de transcribirlo. Por eso el transcript que Whisper devuelve tiene los nombres reales, y el name-hint que le mandamos a Whisper también lleva nombres completos (mejora la precisión de nombres panameños; la exposición es marginal sobre el audio que ya los contiene). La excepción **NO se ensancha a Claude**: toda call de **texto** a un LLM sigue redactada sin excepción (extraction y cualquier otra → `redactPII` antes, `unredactPII` después).
+- **Bound que lo hace defendible:** la OpenAI API **no entrena con datos de API** y soporta **retención cero / 30 días configurable**. Roberto confirma zero-retention en los settings de la org de OpenAI por separado.
+- **Lo que SÍ se redacta aunque la fuente sea voz:** el row de `audit_logs feature='voice_transcription'` guarda el transcript **redactado** (Opción 2), no el crudo. El crudo solo vive en `class_observations.transcript_raw` (tabla con RLS de menores, no un log). Ver `lib/ai/whisper.ts`.
+- **Deuda asociada:** reconsiderar el provider de transcripción (self-host / DPA con residencia EU) en el pase multi-region de Sprint 3 — anotado en Architecture §16.5 (audit de leak vectors).
 
 ### 3.5 Telemetry on AI drafts (Sprint 2 ajuste 2)
 
