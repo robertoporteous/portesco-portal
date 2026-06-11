@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { extractText, buildClaudeAuditRow } from "@/lib/ai/claude";
+import {
+  extractText,
+  buildClaudeAuditRow,
+  buildClaudeFailureAuditRow,
+} from "@/lib/ai/claude";
 import {
   buildExtractionUserPrompt,
   EXTRACT_MENTIONS_SCHEMA,
@@ -126,5 +130,34 @@ describe("EXTRACT_MENTIONS_SCHEMA — válido para structured outputs", () => {
       "medium",
       "low",
     ]);
+  });
+});
+
+describe("buildClaudeFailureAuditRow — audita el intento fallido (§3.3)", () => {
+  const { redactedText, mappings } = redactPII(
+    buildExtractionUserPrompt(KIDS, "Carlos García jugó bien."),
+    { kidsEnrolled: KIDS }
+  );
+  const row = buildClaudeFailureAuditRow({
+    feature: "voice_extraction",
+    userId: "prof-1",
+    redactedPrompt: redactedText,
+    mappings,
+    latencyMs: 800,
+    error: "overloaded_error",
+    responseFormat: "json",
+    relatedObservationId: "obs-9",
+  });
+
+  it("records the attempt: no output, redacted prompt, error in metadata", () => {
+    expect(row.feature).toBe("voice_extraction");
+    expect(row.ai_output).toBeNull();
+    expect(row.input_raw).toBeNull();
+    expect(row.input_redacted).not.toContain("Carlos García");
+    expect(row.input_redacted).toContain("[STUDENT_1]");
+    expect(row.metadata.failed).toBe(true);
+    expect(row.metadata.error).toBe("overloaded_error");
+    expect(row.related_observation_id).toBe("obs-9");
+    expect(JSON.stringify(row.metadata)).not.toContain("Carlos");
   });
 });

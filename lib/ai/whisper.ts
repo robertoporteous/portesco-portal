@@ -145,6 +145,59 @@ export function buildTranscriptionAuditRow(input: {
   };
 }
 
+// Audit row de FALLO (guardrail #2 Tarea 7): si la call a Whisper tira (tras los
+// retries internos del SDK), registramos el INTENTO + el error igual. Sin PII:
+// ai_output null, sin nombres en metadata.
+export type TranscriptionFailureAuditRow = {
+  user_id: string;
+  feature: "voice_transcription";
+  input_raw: null;
+  input_redacted: null;
+  ai_output: null;
+  data_classification: "pii";
+  model_name: string;
+  model_version: null;
+  input_tokens: null;
+  output_tokens: null;
+  latency_ms: number;
+  ai_confidence: null;
+  related_observation_id: string;
+  metadata: {
+    failed: true;
+    error: string;
+    kids_in_context: number;
+  };
+};
+
+export function buildTranscriptionFailureAuditRow(input: {
+  userId: string;
+  observationId: string;
+  kidsEnrolled: Kid[];
+  latencyMs: number;
+  error: string;
+}): TranscriptionFailureAuditRow {
+  return {
+    user_id: input.userId,
+    feature: "voice_transcription",
+    input_raw: null,
+    input_redacted: null,
+    ai_output: null,
+    data_classification: "pii",
+    model_name: WHISPER_MODEL,
+    model_version: null,
+    input_tokens: null,
+    output_tokens: null,
+    latency_ms: input.latencyMs,
+    ai_confidence: null,
+    related_observation_id: input.observationId,
+    metadata: {
+      failed: true,
+      error: input.error,
+      kids_in_context: input.kidsEnrolled.length,
+    },
+  };
+}
+
 /** Normaliza el path quitando el prefijo del bucket si viene incluido, y
  *  devuelve también el filename (con extensión) que OpenAI usa para inferir el
  *  formato del audio. */
@@ -190,13 +243,33 @@ export async function transcribeVoice(
   const contextHint = args.contextHint ?? buildContextHint(args.kidsEnrolled);
 
   const startedAt = Date.now();
-  const result = await openai.audio.transcriptions.create({
-    file,
-    model: WHISPER_MODEL,
-    language: "es",
-    prompt: contextHint || undefined,
-    response_format: "verbose_json",
-  });
+  let result;
+  try {
+    result = await openai.audio.transcriptions.create({
+      file,
+      model: WHISPER_MODEL,
+      language: "es",
+      prompt: contextHint || undefined,
+      response_format: "verbose_json",
+    });
+  } catch (err) {
+    // §3.3: registrar el intento fallido antes de propagar (best-effort: no
+    // dejamos que un fallo del audit enmascare el error original de la API).
+    const failLatency = Date.now() - startedAt;
+    const message = err instanceof Error ? err.message : String(err);
+    const failRow = buildTranscriptionFailureAuditRow({
+      userId: args.userId,
+      observationId: args.observationId,
+      kidsEnrolled: args.kidsEnrolled,
+      latencyMs: failLatency,
+      error: message,
+    });
+    await supabase.from("audit_logs").insert(failRow).then(
+      () => undefined,
+      () => undefined
+    );
+    throw err;
+  }
   const latencyMs = Date.now() - startedAt;
 
   // verbose_json → { text, language, duration, segments }

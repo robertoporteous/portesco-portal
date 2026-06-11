@@ -4,6 +4,7 @@ import {
   buildContextHint,
   deriveConfidenceLabel,
   buildTranscriptionAuditRow,
+  buildTranscriptionFailureAuditRow,
   parseStoragePath,
 } from "@/lib/ai/whisper";
 import type { Kid } from "@/lib/ai/redact";
@@ -116,5 +117,27 @@ describe("buildTranscriptionAuditRow — Opción 2 (transcript redactado)", () =
     expect(row.model_name).toBe("whisper-1");
     expect(row.related_observation_id).toBe("obs-9");
     expect(row.ai_confidence).toBe("high");
+  });
+});
+
+describe("buildTranscriptionFailureAuditRow — audita el intento fallido (§3.3)", () => {
+  const row = buildTranscriptionFailureAuditRow({
+    userId: "prof-1",
+    observationId: "obs-9",
+    kidsEnrolled: KIDS,
+    latencyMs: 1200,
+    error: "Request timed out",
+  });
+
+  it("records the attempt: no output, no PII, error in metadata", () => {
+    expect(row.feature).toBe("voice_transcription");
+    expect(row.ai_output).toBeNull();
+    expect(row.input_raw).toBeNull();
+    expect(row.input_redacted).toBeNull();
+    expect(row.metadata.failed).toBe(true);
+    expect(row.metadata.error).toBe("Request timed out");
+    expect(row.metadata.kids_in_context).toBe(3);
+    expect(row.related_observation_id).toBe("obs-9");
+    expect(JSON.stringify(row)).not.toContain("Carlos");
   });
 });

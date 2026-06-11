@@ -141,6 +141,68 @@ export function buildClaudeAuditRow(input: {
   };
 }
 
+// Audit row de FALLO (guardrail #2 Tarea 7): si la call a Claude tira (tras los
+// retries internos del SDK), registramos el intento + el error. Sin PII cruda:
+// ai_output null, input_redacted ya redactado.
+export type ClaudeFailureAuditRow = {
+  user_id: string;
+  feature: ClaudeFeature;
+  input_raw: null;
+  input_redacted: string;
+  ai_output: null;
+  data_classification: "pii" | "sensitive" | "general";
+  model_name: string;
+  model_version: null;
+  input_tokens: null;
+  output_tokens: null;
+  latency_ms: number;
+  ai_confidence: null;
+  related_observation_id: string | null;
+  related_report_id: string | null;
+  metadata: {
+    failed: true;
+    error: string;
+    response_format: "text" | "json";
+    redaction_placeholders: number;
+  };
+};
+
+export function buildClaudeFailureAuditRow(input: {
+  feature: ClaudeFeature;
+  userId: string;
+  redactedPrompt: string;
+  mappings: RedactionMappings;
+  latencyMs: number;
+  error: string;
+  responseFormat: "text" | "json";
+  relatedObservationId?: string;
+  relatedReportId?: string;
+  dataClassification?: "pii" | "sensitive" | "general";
+}): ClaudeFailureAuditRow {
+  return {
+    user_id: input.userId,
+    feature: input.feature,
+    input_raw: null,
+    input_redacted: input.redactedPrompt,
+    ai_output: null,
+    data_classification: input.dataClassification ?? "pii",
+    model_name: CLAUDE_MODEL,
+    model_version: null,
+    input_tokens: null,
+    output_tokens: null,
+    latency_ms: input.latencyMs,
+    ai_confidence: null,
+    related_observation_id: input.relatedObservationId ?? null,
+    related_report_id: input.relatedReportId ?? null,
+    metadata: {
+      failed: true,
+      error: input.error,
+      response_format: input.responseFormat,
+      redaction_placeholders: Object.keys(input.mappings).length,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Side-effecting: redact → Anthropic → unredact/parse → audit INSERT.
 // ---------------------------------------------------------------------------
@@ -162,31 +224,52 @@ export async function callClaude<T = string>(
   // 2) Anthropic SDK — Sonnet 4.6, adaptive thinking. structured outputs si hay
   //    schema (garantiza JSON válido sin prefill).
   const client = new Anthropic({ apiKey });
+  const supabase = createServiceClient();
   const startedAt = Date.now();
-  const res = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
-    thinking: { type: "adaptive" },
-    system: args.systemPrompt,
-    messages: [{ role: "user", content: redactedText }],
-    ...(responseFormat === "json" && args.jsonSchema
-      ? {
-          output_config: {
-            format: { type: "json_schema" as const, schema: args.jsonSchema },
-          },
-        }
-      : {}),
-  });
-  const latencyMs = Date.now() - startedAt;
-
-  if (res.stop_reason === "refusal") {
-    throw new Error(`callClaude: model refused (feature=${args.feature})`);
+  let res;
+  try {
+    res = await client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
+      thinking: { type: "adaptive" },
+      system: args.systemPrompt,
+      messages: [{ role: "user", content: redactedText }],
+      ...(responseFormat === "json" && args.jsonSchema
+        ? {
+            output_config: {
+              format: { type: "json_schema" as const, schema: args.jsonSchema },
+            },
+          }
+        : {}),
+    });
+  } catch (err) {
+    // §3.3: registrar el intento fallido antes de propagar (best-effort).
+    const failLatency = Date.now() - startedAt;
+    const message = err instanceof Error ? err.message : String(err);
+    const failRow = buildClaudeFailureAuditRow({
+      feature: args.feature,
+      userId: args.userId,
+      redactedPrompt: redactedText,
+      mappings,
+      latencyMs: failLatency,
+      error: message,
+      responseFormat,
+      relatedObservationId: args.relatedObservationId,
+      relatedReportId: args.relatedReportId,
+      dataClassification: args.dataClassification,
+    });
+    await supabase.from("audit_logs").insert(failRow).then(
+      () => undefined,
+      () => undefined
+    );
+    throw err;
   }
+  const latencyMs = Date.now() - startedAt;
 
   const rawOutput = extractText(res.content);
 
-  // 3) audit_logs (redactado). service_role bypassa la RLS de audit_logs.
-  const supabase = createServiceClient();
+  // 3) audit_logs (redactado). Se escribe para TODA call completada — incluido
+  //    un refusal (es una call completada, §3.3). service_role bypassa la RLS.
   const auditRow = buildClaudeAuditRow({
     feature: args.feature,
     userId: args.userId,
@@ -209,6 +292,11 @@ export async function callClaude<T = string>(
   if (auditError) {
     // §3.3: sin audit no devolvemos output.
     throw new Error(`callClaude: audit_logs insert failed: ${auditError.message}`);
+  }
+
+  // Refusal: ya quedó auditado arriba; recién acá cortamos.
+  if (res.stop_reason === "refusal") {
+    throw new Error(`callClaude: model refused (feature=${args.feature})`);
   }
 
   // 4) Resolver el output devuelto al caller.
