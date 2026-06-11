@@ -195,3 +195,30 @@ describe.each(PATHS)('/coordinator-pad auth gate (proxy.ts) — $label', ({ path
     expect(pathname).toBeNull();
   });
 });
+
+// Professor surface (Bloque 3) — the inverse gate: professor (its own surface)
+// + coordinator + admin enter; parent has none. Pins the new proxy.ts rule so a
+// refactor can't silently let parents reach minors' rosters under /professor.
+describe('/professor auth gate (proxy.ts)', () => {
+  const PROF_PATH = '/professor';
+
+  it('parent → redirected to /', async () => {
+    const { pathname } = await gateFor(EMAILS.parent, PROF_PATH);
+    expect(pathname).toBe('/');
+  });
+
+  it('professor → allowed through (no redirect)', async () => {
+    const { pathname } = await gateFor(EMAILS.professor, PROF_PATH);
+    expect(pathname).toBeNull();
+  });
+
+  it('coordinator → allowed through (no redirect)', async () => {
+    const { pathname } = await gateFor(EMAILS.coordinator, PROF_PATH);
+    expect(pathname).toBeNull();
+  });
+
+  it('admin → allowed through (no redirect)', async () => {
+    const { pathname } = await gateFor(EMAILS.admin, PROF_PATH);
+    expect(pathname).toBeNull();
+  });
+});

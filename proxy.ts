@@ -57,6 +57,13 @@ export async function proxy(request: NextRequest) {
     );
   }
 
+  // Professor surface (Bloque 3): professor + coordinator + admin enter; parent
+  // has none (→ /). Edge line behind (staff)/professor/layout.tsx — closes the
+  // Tarea 1 TODO where the layout guard was the only line.
+  if (pathname.startsWith("/professor") && !isAdmin && !isStaff) {
+    return redirectPreservingCookies(request, "/", supabaseResponse);
+  }
+
   if (pathname.startsWith("/staff") && !isAdmin && !isStaff) {
     return redirectPreservingCookies(request, "/", supabaseResponse);
   }
