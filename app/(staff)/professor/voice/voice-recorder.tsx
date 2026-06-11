@@ -47,6 +47,11 @@ function mimeToExt(mime: string): string {
   }
 }
 
+// HARD CAP de grabación = 8 min (Tarea 6, el TODO anotado en el spike Tarea 1).
+// A ~1.35 MB/min (AAC) → ~10.8 MB worst case, dentro del bucket voice-obs de
+// 15 MB. El recorder se auto-para al llegar al cap.
+const HARD_CAP_SECONDS = 8 * 60;
+
 function formatClock(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
   const s = totalSeconds % 60;
@@ -61,12 +66,17 @@ function formatSize(bytes: number): string {
 
 type Phase = "idle" | "recording" | "stopped" | "error";
 
-type Recording = {
-  url: string;
+// Payload expuesto al parent (voice-capture.tsx → Tarea 7 sube el blob).
+export type RecordingPayload = {
+  blob: Blob;
   mime: string;
   ext: string;
   sizeBytes: number;
   durationSec: number;
+};
+
+type Recording = RecordingPayload & {
+  url: string;
 };
 
 type Interruption = {
@@ -74,7 +84,13 @@ type Interruption = {
   recoveredState: string | null;
 };
 
-export function VoiceRecorder() {
+export function VoiceRecorder({
+  onRecordingChange,
+}: {
+  /** Notifica al parent cuando hay una grabación lista (o null al descartar).
+   *  Tarea 7 lo usa para subir el blob al bucket voice-obs. */
+  onRecordingChange?: (rec: RecordingPayload | null) => void;
+} = {}) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsedSec, setElapsedSec] = useState(0);
@@ -90,6 +106,10 @@ export function VoiceRecorder() {
   // elapsedSec is mirrored into a ref so the visibilitychange listener (bound
   // once) can stamp interruptions without re-subscribing on every tick.
   const elapsedRef = useRef(0);
+  // Keep the latest onRecordingChange in a ref so onstop (bound inside `start`)
+  // never holds a stale callback without re-creating the recorder.
+  const onChangeRef = useRef(onRecordingChange);
+  onChangeRef.current = onRecordingChange;
 
   // Feature detection (client-only). iOS Safari < 14.5 carece de MediaRecorder.
   useEffect(() => {
@@ -183,15 +203,17 @@ export function VoiceRecorder() {
         const mime = recorder.mimeType || "audio/webm";
         const blob = new Blob(chunksRef.current, { type: mime });
         const url = URL.createObjectURL(blob);
-        setRecording({
-          url,
+        const payload: RecordingPayload = {
+          blob,
           mime,
           ext: mimeToExt(mime),
           sizeBytes: blob.size,
           durationSec: Math.round((Date.now() - startMsRef.current) / 1000),
-        });
+        };
+        setRecording({ ...payload, url });
         setPhase("stopped");
         stopTracks();
+        onChangeRef.current?.(payload);
       };
 
       // timeslice 1s: chunks periódicos → más robusto en grabaciones largas
@@ -206,6 +228,10 @@ export function VoiceRecorder() {
         const secs = Math.round((Date.now() - startMsRef.current) / 1000);
         elapsedRef.current = secs;
         setElapsedSec(secs);
+        // Hard cap: auto-parar a los 8 min (onstop arma el payload normalmente).
+        if (secs >= HARD_CAP_SECONDS && recorderRef.current?.state === "recording") {
+          recorderRef.current.stop();
+        }
       }, 250);
     } catch (err) {
       const name = err instanceof DOMException ? err.name : "Error";
@@ -235,7 +261,10 @@ export function VoiceRecorder() {
     setPhase("idle");
     setElapsedSec(0);
     elapsedRef.current = 0;
+    onChangeRef.current?.(null);
   }, [recording]);
+
+  const nearCap = HARD_CAP_SECONDS - elapsedSec;
 
   // ---- Fallback cuando MediaRecorder no está disponible (exit criterion) ----
   if (supported === false) {
@@ -276,11 +305,19 @@ export function VoiceRecorder() {
             {formatClock(elapsedSec)}
           </span>
         </div>
-        {phase === "recording" && (
+        {phase === "recording" ? (
           <span className="flex items-center gap-2 text-sm font-medium text-red-600">
             <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-red-600" />
-            Grabando…
+            {nearCap <= 30
+              ? `Grabando… se corta en ${formatClock(Math.max(nearCap, 0))}`
+              : "Grabando…"}
           </span>
+        ) : (
+          phase === "idle" && (
+            <span className="text-xs text-[color:var(--portesco-gray-mid)]">
+              Máximo 8 min
+            </span>
+          )
         )}
       </div>
 

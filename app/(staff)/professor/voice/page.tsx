@@ -1,36 +1,57 @@
-import { VoiceRecorder } from "./voice-recorder";
+import { createClient } from "@/lib/supabase/server";
+import { formatPanamaDate, formatPanamaTime } from "@/lib/dates";
+import { VoiceCapture } from "./voice-capture";
 
-// SPIKE Bloque 3 · Tarea 1 — gate del bloque.
-// Pantalla de grabación client-only. NO sube al bucket todavía (Tarea 7).
-// Mobile-first iPhone vertical. Roberto la prueba en Safari iOS real, logueado
-// como ADMIN, para validar:
-//   - graba una nota CONTINUA de 3+ min sin cortarse
-//   - bloquear/dimear la pantalla mid-grabación → reporta si sobrevive o muere
-//   - reproduce la grabación
-//   - el MIME real aparece en pantalla (para parametrizar el path + validar
-//     contra los MIME del bucket voice-obs)
-export default function ProfessorVoiceSpikePage() {
+// Professor voice capture (Bloque 3, Tarea 6 pieza 4) — recorder GRADUADO del
+// spike (Tarea 1) con hard cap de 8 min + tab Voz/Texto. CLIENT-ONLY: la subida
+// al bucket voice-obs + pipeline async es Tarea 7. Mobile-first iPhone vertical.
+//
+// Entra desde el sticky "Grabar" de la vista de sesión (?session=<id>). El label
+// de la sesión se resuelve vía RLS (professor select own); si no es del profesor,
+// no se attachea (Tarea 7 valida ownership server-side al subir).
+export default async function ProfessorVoicePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ session?: string }>;
+}) {
+  const { session: sessionId } = await searchParams;
+
+  let sessionLabel: string | undefined;
+  if (sessionId) {
+    const supabase = await createClient();
+    const { data: session } = await supabase
+      .from("class_sessions")
+      .select("scheduled_start_at, activities!inner(name)")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (session) {
+      const activity = (
+        Array.isArray(session.activities)
+          ? session.activities[0]
+          : session.activities
+      ) as { name: string };
+      const start = new Date(session.scheduled_start_at);
+      sessionLabel = `${activity.name} · ${formatPanamaDate(start)} ${formatPanamaTime(start)}`;
+    }
+  }
+
   return (
     <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col px-5 py-6">
-      <header className="mb-2">
+      <header className="mb-4">
         <p className="text-xs font-medium uppercase tracking-wide text-[color:var(--portesco-gray-mid)]">
-          Spike · grabación de voz
+          Profesor · observación de clase
         </p>
         <h1 className="text-xl font-semibold text-[color:var(--portesco-blue)]">
-          Observación de clase
+          Grabar o escribir
         </h1>
         <p className="mt-1 text-sm text-[color:var(--portesco-gray-mid)]">
-          Grabá tu nota grupal de 3–5 min. Tap para iniciar, tap para parar.
+          Tap para iniciar, tap para parar. Máximo 8 min.
         </p>
       </header>
 
-      <div className="mt-4 flex-1">
-        <VoiceRecorder />
+      <div className="flex-1">
+        <VoiceCapture sessionId={sessionId} sessionLabel={sessionLabel} />
       </div>
-
-      <p className="mt-6 text-center text-xs text-[color:var(--portesco-gray-mid)]">
-        Spike de validación · todavía no sube al servidor
-      </p>
     </div>
   );
 }
