@@ -5,6 +5,7 @@ import { Mic, Square, RotateCcw, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { mimeToExt } from "@/lib/audio";
 
 // SPIKE del recorder (Bloque 3 · Tarea 1). Client-only: graba con MediaRecorder,
 // reproduce en pantalla, y muestra el MIME real + duración + tamaño. NO sube al
@@ -21,36 +22,18 @@ import { cn } from "@/lib/utils";
 //  - MIME real iOS = audio/mp4; codecs=mp4a.40.2 → ext .m4a.
 //  - El recorder SOBREVIVE al bloqueo/dimeo de pantalla (estado "recording" al
 //    volver, nunca "inactive") → tap/tap + lock-survive confirmados en device.
-//  - Peso ≈ 1.35 MB/min (AAC). HARD CAP de grabación = 8 min (Tarea 6) →
-//    ~10.8 MB worst case. Por eso el bucket voice-obs se subió a 15 MB en
-//    Supabase Studio (cero código). El cap de 8 min sigue válido contra 15 MB.
-//    TODO(Tarea 6): enforce el hard cap de 8 min en el recorder productivo.
+//  - Peso ≈ 1.35 MB/min (AAC). HARD CAP de grabación = 5 min (Tarea 7) →
+//    ~6.75 MB worst case, dentro del bucket voice-obs de 15 MB.
+//    El cap es 5 (no 8) por el techo de 60s de Vercel HOBBY: el pipeline inline
+//    (transcripción + extracción) tiene que entrar en maxDuration=60, y todavía
+//    no conocemos la latencia real de Whisper con español panameño. Conservador
+//    a 5 min (calza con el target 3-5 min de la nota grupal); se revisa al alza
+//    post-Tarea 12 con datos reales de latencia.
 
-// MIME real (sin el parámetro ;codecs=...) → extensión de archivo para el path.
-// El bucket voice-obs whitelistea audio/webm, audio/mp4, audio/mpeg.
-function mimeToExt(mime: string): string {
-  const base = mime.split(";")[0].trim().toLowerCase();
-  switch (base) {
-    case "audio/webm":
-      return "webm";
-    case "audio/mp4":
-    case "audio/x-m4a":
-    case "audio/aac":
-      return "m4a";
-    case "audio/mpeg":
-      return "mp3";
-    case "audio/ogg":
-      return "ogg";
-    default:
-      // Fallback: segunda mitad del MIME, sin caracteres raros.
-      return base.split("/")[1]?.replace(/[^a-z0-9]/g, "") || "bin";
-  }
-}
-
-// HARD CAP de grabación = 8 min (Tarea 6, el TODO anotado en el spike Tarea 1).
-// A ~1.35 MB/min (AAC) → ~10.8 MB worst case, dentro del bucket voice-obs de
-// 15 MB. El recorder se auto-para al llegar al cap.
-const HARD_CAP_SECONDS = 8 * 60;
+// HARD CAP de grabación = 5 min. Conservador por el techo de 60s de Vercel
+// Hobby (el pipeline inline debe entrar en maxDuration=60). Se revisa al alza
+// post-Tarea 12 con latencia real de Whisper. El recorder se auto-para al cap.
+const HARD_CAP_SECONDS = 5 * 60;
 
 function formatClock(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -315,7 +298,7 @@ export function VoiceRecorder({
         ) : (
           phase === "idle" && (
             <span className="text-xs text-[color:var(--portesco-gray-mid)]">
-              Máximo 8 min
+              Máximo 5 min
             </span>
           )
         )}

@@ -1,12 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { VoiceRecorder, type RecordingPayload } from "./voice-recorder";
 
 const TEXT_MAX = 2000;
+
+type SubmitResult = {
+  observationId: string;
+  status:
+    | "pending_confirmation"
+    | "transcription_failed"
+    | "extraction_failed";
+  mentionCount?: number;
+  ambiguousCount?: number;
+  error?: string;
+};
 
 // Voz/Texto capture shell (Bloque 3, Tarea 6 pieza 4). CLIENT-ONLY: graba o
 // escribe la observación grupal. La SUBIDA al bucket + pipeline async es Tarea 7
@@ -22,8 +33,45 @@ export function VoiceCapture({
   const [tab, setTab] = useState<"voz" | "texto">("voz");
   const [recording, setRecording] = useState<RecordingPayload | null>(null);
   const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const hasContent = tab === "voz" ? !!recording : text.trim().length > 0;
+  // Idempotencia: nada de re-enviar una vez procesado ok; sin sesión no se sube.
+  const done = result?.status === "pending_confirmation";
+  const canSubmit = hasContent && !!sessionId && !submitting && !done;
+
+  const submit = useCallback(async () => {
+    if (!sessionId || submitting || done) return; // guard anti doble-tap
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("sessionId", sessionId);
+      fd.append("mode", tab);
+      if (tab === "texto") {
+        fd.append("text", text.trim());
+      } else if (recording) {
+        fd.append("audio", recording.blob, `obs.${recording.ext}`);
+      }
+      const res = await fetch("/api/observations/voice", {
+        method: "POST",
+        body: fd,
+      });
+      const json = (await res.json()) as SubmitResult & { error?: string };
+      if (!res.ok) {
+        setErrorMsg(json.error ?? `Error ${res.status}`);
+        setSubmitting(false); // permite reintentar
+        return;
+      }
+      setResult(json);
+      // No re-habilitamos: status final ya llegó (modal de confirmación = Tarea 8).
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Error de red");
+      setSubmitting(false);
+    }
+  }, [sessionId, submitting, done, tab, text, recording]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -69,21 +117,55 @@ export function VoiceCapture({
         </div>
       )}
 
-      {/* Enviar — deshabilitado hasta Tarea 7 (subida + pipeline). */}
-      <div className="flex flex-col gap-1.5">
-        <Button
-          disabled={!hasContent}
-          className="h-14 w-full text-base font-semibold"
-          style={{ backgroundColor: "var(--portesco-blue)" }}
-          // onClick: Tarea 7 — sube blob/texto a /api/observations/voice.
-          title={sessionId ? undefined : "Falta la sesión"}
-        >
-          Enviar observación
-        </Button>
-        <p className="text-center text-xs text-[color:var(--portesco-gray-mid)]">
-          La subida y el procesamiento se cablean en el siguiente paso.
-        </p>
-      </div>
+      {/* Enviar — POST a /api/observations/voice (pipeline inline). */}
+      {!done && (
+        <div className="flex flex-col gap-1.5">
+          <Button
+            onClick={submit}
+            disabled={!canSubmit}
+            className="h-14 w-full text-base font-semibold"
+            style={{ backgroundColor: "var(--portesco-blue)" }}
+            title={sessionId ? undefined : "Falta la sesión"}
+          >
+            {submitting ? "Procesando…" : "Enviar observación"}
+          </Button>
+          {!sessionId && (
+            <p className="text-center text-xs text-[color:var(--portesco-gray-mid)]">
+              Abrí esta pantalla desde una clase para asociar la observación.
+            </p>
+          )}
+          {errorMsg && (
+            <p className="text-center text-xs text-red-600">{errorMsg}</p>
+          )}
+        </div>
+      )}
+
+      {/* Resultado del pipeline. El modal de confirmación (Tarea 8) abre desde
+          esta misma respuesta; acá mostramos un resumen mínimo. */}
+      {result && result.status === "pending_confirmation" && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+          <p className="font-medium">Observación procesada</p>
+          <p className="mt-1">
+            {result.mentionCount ?? 0} menciones detectadas
+            {result.ambiguousCount
+              ? ` · ${result.ambiguousCount} ambiguas`
+              : ""}{" "}
+            · pendiente de confirmación.
+          </p>
+        </div>
+      )}
+      {result &&
+        (result.status === "transcription_failed" ||
+          result.status === "extraction_failed") && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <p className="font-medium">
+              {result.status === "transcription_failed"
+                ? "Falló la transcripción"
+                : "Falló la extracción"}
+            </p>
+            {result.error && <p className="mt-1 break-words">{result.error}</p>}
+          </div>
+        )}
     </div>
   );
 }

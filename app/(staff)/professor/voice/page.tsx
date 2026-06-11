@@ -45,7 +45,7 @@ export default async function ProfessorVoicePage({
           Grabar o escribir
         </h1>
         <p className="mt-1 text-sm text-[color:var(--portesco-gray-mid)]">
-          Tap para iniciar, tap para parar. Máximo 8 min.
+          Tap para iniciar, tap para parar. Máximo 5 min.
         </p>
       </header>
 
