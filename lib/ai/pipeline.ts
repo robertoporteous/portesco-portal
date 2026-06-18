@@ -124,6 +124,9 @@ export async function runVoicePipeline(args: RunArgs): Promise<PipelineResult> {
       relatedObservationId: observationId,
       responseFormat: "json",
       jsonSchema: EXTRACT_MENTIONS_SCHEMA as unknown as Record<string, unknown>,
+      // 7.3: thinking off para la extracción (structured output + prompt fuerte
+      // bastan). Corta el grueso de la latencia; calidad validada en corrida real.
+      thinkingMode: "disabled",
     });
 
     const extract = claudeRes.output;

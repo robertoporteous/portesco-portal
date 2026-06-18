@@ -109,6 +109,24 @@ describe("buildClaudeAuditRow — nunca PII cruda en logs (§3.4)", () => {
     expect(row.metadata.redaction_placeholders).toBe(3);
     expect(row.metadata.thinking).toBe("adaptive");
   });
+
+  it("records thinkingMode 'disabled' when extraction opts out (7.3)", () => {
+    const disabledRow = buildClaudeAuditRow({
+      feature: "voice_extraction",
+      userId: "prof-1",
+      redactedPrompt: "[STUDENT_1] ok",
+      rawClaudeOutput: "{}",
+      mappings: { "[STUDENT_1]": "Carlos García" },
+      modelVersion: "claude-sonnet-4-6",
+      inputTokens: 10,
+      outputTokens: 5,
+      latencyMs: 4000,
+      stopReason: "end_turn",
+      responseFormat: "json",
+      thinkingMode: "disabled",
+    });
+    expect(disabledRow.metadata.thinking).toBe("disabled");
+  });
 });
 
 describe("EXTRACT_MENTIONS_SCHEMA — válido para structured outputs", () => {

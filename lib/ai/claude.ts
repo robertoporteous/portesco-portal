@@ -48,6 +48,12 @@ export type ClaudeCallArgs = {
   jsonSchema?: Record<string, unknown>;
   maxTokens?: number;
   dataClassification?: "pii" | "sensitive" | "general";
+  /** Modo de thinking. Default 'adaptive'. voice_extraction usa 'disabled'
+   *  (7.3): la extracción es un mapeo transcript→JSON estructurado; el
+   *  structured output + el prompt fuerte no necesitan reasoning profundo, y
+   *  desactivarlo corta el grueso de la latencia (~22-29s → objetivo <10s).
+   *  La CALIDAD se valida en corrida real antes de quedarse con 'disabled'. */
+  thinkingMode?: "adaptive" | "disabled";
 };
 
 export type ClaudeCallResult<T = string> = {
@@ -92,7 +98,7 @@ export type ClaudeAuditRow = {
     response_format: "text" | "json";
     stop_reason: string | null;
     redaction_placeholders: number;
-    thinking: "adaptive";
+    thinking: "adaptive" | "disabled";
   };
 };
 
@@ -116,6 +122,7 @@ export function buildClaudeAuditRow(input: {
   relatedObservationId?: string;
   relatedReportId?: string;
   dataClassification?: "pii" | "sensitive" | "general";
+  thinkingMode?: "adaptive" | "disabled";
 }): ClaudeAuditRow {
   return {
     user_id: input.userId,
@@ -136,7 +143,7 @@ export function buildClaudeAuditRow(input: {
       response_format: input.responseFormat,
       stop_reason: input.stopReason,
       redaction_placeholders: Object.keys(input.mappings).length,
-      thinking: "adaptive",
+      thinking: input.thinkingMode ?? "adaptive",
     },
   };
 }
@@ -214,6 +221,7 @@ export async function callClaude<T = string>(
   if (!apiKey) throw new Error("callClaude: missing ANTHROPIC_API_KEY");
 
   const responseFormat = args.responseFormat ?? "text";
+  const thinkingMode = args.thinkingMode ?? "adaptive";
 
   // 1) Redactar el user prompt (system es estático, sin PII).
   const { redactedText, mappings } = redactPII(
@@ -231,7 +239,10 @@ export async function callClaude<T = string>(
     res = await client.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS,
-      thinking: { type: "adaptive" },
+      thinking:
+        thinkingMode === "disabled"
+          ? { type: "disabled" }
+          : { type: "adaptive" },
       system: args.systemPrompt,
       messages: [{ role: "user", content: redactedText }],
       ...(responseFormat === "json" && args.jsonSchema
@@ -285,6 +296,7 @@ export async function callClaude<T = string>(
     relatedObservationId: args.relatedObservationId,
     relatedReportId: args.relatedReportId,
     dataClassification: args.dataClassification,
+    thinkingMode,
   });
   const { error: auditError } = await supabase
     .from("audit_logs")
