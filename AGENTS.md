@@ -308,9 +308,14 @@ Files in this repo:
   *Síntoma:* `app/(staff)/coordinator-pad/sessions/[id]/attendance-list.tsx` inicializa `statuses`/`closed`/`eventCounts` con `useState(() => …)` una sola vez. Tras `router.refresh()` o un cambio server-side, el client NO reconcilia hasta remount.
   *Trigger:* **Bloque 3 — confirmación realtime.** Cuando el pipeline voice→AI (u otro coordinator) mute la misma sesión en vivo, el update se pierde hasta remontar. Reconciliar (sembrar desde props con el patrón de transición, o realtime subscription) ANTES de cablear el modal de confirmación realtime.
 
-- **DEBT(bloque-3): los writes no enforszan `closed_at` server-side.** (Code review Bloque 2, hallazgo Y2.)
+- **DEBT(attendance): `markAttendance` no enforza `closed_at` server-side.** (Code review Bloque 2, hallazgo Y2. Scope acotado en Bloque 3, Tarea 9.)
   *Síntoma:* `markAttendance` (`actions.ts`) no chequea que la sesión esté abierta; solo la UI deshabilita los botones. Hoy es bajo impacto (cierre soft + reabrir existe), pero es defensa-en-profundidad ausente para data de menores.
-  *Trigger:* **Bloque 3 — realtime** puede correr un write contra un cierre concurrente. Agregar guard server-side (ej. `.is('closed_at', null)` o chequeo explícito) en los writes que deban respetar el cierre. (Eventualidades siguen permitidas en cerrada — intencional.)
+  *Alcance real (revisado Tarea 9):* la deuda es SOLO de attendance. El confirm de voz (`PATCH /api/observations/[id]/confirm`) **NO** enforza `closed_at` a propósito y **NO paga esta deuda**: la observación de voz es post-clase por diseño (el profe graba y confirma después de que la sesión cerró), igual que las eventualidades — que también siguen permitidas en cerrada, intencional. Poner un guard de cierre ahí rompería el flujo normal.
+  *Trigger:* pre-launch, o cualquier write de attendance que deba respetar el cierre. Agregar guard server-side (ej. `.is('closed_at', null)` o chequeo explícito) en `markAttendance`.
+
+- **DEBT(bloque-4): no hay punto de recuperación si el profe interrumpe el loop de confirmación.** (Tarea 8, decisión flujo A.)
+  *Síntoma:* el modal de confirmación abre desde la respuesta del POST (mismo device, caso normal). Si el profe cierra la pantalla / refresca antes de confirmar, la observación queda en `pending_confirmation` **inerte** (en flujo A las menciones se insertan solo al confirmar, así que no contamina el perfil) pero **no hay forma de reabrir el modal** para retomarla. Realtime (channel `obs:{author_id}`, Architecture §6.5) quedó diferido como fallback junto con esto.
+  *Trigger:* **Bloque 4.** Cablear realtime O una vista "pendientes de confirmar" que reabra el modal releyendo `extraction_json` (ya resuelto server-side). Ligado a la limpieza de filas stuck en `pending_*` (ver status del bloque).
 
 - **DEBT(pre-launch UX): `isPending` único por componente bloquea todo el roster por tap.** (Code review Bloque 2, hallazgo Y7.)
   *Síntoma:* en `attendance-list.tsx` un solo `useTransition` deshabilita TODOS los botones del roster mientras resuelve una marca; en conexión lenta es un lock notable. El `EventualityDrawer` deja chips/textarea editables durante el save.

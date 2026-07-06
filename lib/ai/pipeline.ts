@@ -54,7 +54,9 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-async function getKidsEnrolled(
+// Exportado: el confirm endpoint (Tarea 9) lo reusa para validar que toda
+// reasignación/asignación caiga en el roster REAL de la sesión.
+export async function getKidsEnrolled(
   supabase: SupabaseClient,
   sessionId: string
 ): Promise<Kid[]> {
