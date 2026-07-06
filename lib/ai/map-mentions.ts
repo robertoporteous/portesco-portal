@@ -59,3 +59,92 @@ export function mapMentionsToStudents(
 
   return { rows, skipped };
 }
+
+// ---------------------------------------------------------------------------
+// Vista RESUELTA para el modal de confirmación (Tarea 8.1, flujo A).
+//
+// En flujo A el INSERT de mention_assignments se difiere a la CONFIRMACIÓN. En
+// la extracción solo resolvemos nombres SERVER-SIDE (acá, donde viven los
+// mappings) y persistimos esta vista en class_observations.extraction_json —
+// tabla con RLS de menores, así que llevar nombres reales es correcto (mismo
+// criterio que transcript_raw; audit_logs sigue redactado, Opción 2 intacta).
+// El crudo redactado de Claude ya queda en audit_logs.ai_output.
+// ---------------------------------------------------------------------------
+
+// Resuelve un token [STUDENT_N] → kid del roster por índice (N-1). Mismo mapeo
+// que mapMentionsToStudents (redactPII numera por índice de kidsEnrolled).
+// Devuelve null si el token es inválido o el índice cae fuera del roster.
+export function resolveStudentRef(
+  ref: string,
+  kidsEnrolled: Kid[]
+): Kid | null {
+  const match = STUDENT_REF.exec(ref.trim());
+  if (!match) return null;
+  const index = Number(match[1]) - 1;
+  if (index < 0 || index >= kidsEnrolled.length) return null;
+  return kidsEnrolled[index];
+}
+
+// Mención lista para renderizar en el modal. `idx` es la clave estable que el
+// PATCH /confirm referencia en su delta (el cliente nunca manda student_id que
+// el server inserte a ciegas — ver Tarea 9). `snippet`/`student_name` van con
+// nombres reales (unredactados).
+export type ConfirmMention = {
+  idx: number;
+  student_id: string;
+  student_name: string;
+  snippet: string;
+  sentiment: MentionRow["sentiment"];
+  confidence: MentionRow["ai_confidence"];
+};
+
+export type ConfirmAmbiguous = {
+  idx: number;
+  description: string;
+  candidates: { student_id: string; student_name: string }[];
+};
+
+export type ConfirmationPayload = {
+  mentions: ConfirmMention[];
+  ambiguous: ConfirmAmbiguous[];
+  general_notes: string;
+};
+
+// Builder PURO (unit-testeable sin DB ni APIs pagas). Reusa
+// mapMentionsToStudents para las menciones (mismo mapeo por índice + unredact
+// del snippet) y resuelve los candidatos ambiguos por token. Descripción y
+// general_notes se unredactan porque pueden contener tokens [STUDENT_N].
+export function buildConfirmationPayload(
+  extract: ExtractMentionsResult,
+  kidsEnrolled: Kid[],
+  mappings: RedactionMappings
+): ConfirmationPayload {
+  const { rows } = mapMentionsToStudents(extract, kidsEnrolled, mappings);
+  const nameById = new Map(kidsEnrolled.map((k) => [k.id, k.fullName]));
+
+  const mentions: ConfirmMention[] = rows.map((r, idx) => ({
+    idx,
+    student_id: r.student_id,
+    student_name: nameById.get(r.student_id) ?? "",
+    snippet: r.content_snippet,
+    sentiment: r.sentiment,
+    confidence: r.ai_confidence,
+  }));
+
+  const ambiguous: ConfirmAmbiguous[] = (extract.ambiguous ?? []).map(
+    (a, idx) => ({
+      idx,
+      description: unredactPII(a.description, mappings),
+      candidates: (a.candidate_student_refs ?? [])
+        .map((ref) => resolveStudentRef(ref, kidsEnrolled))
+        .filter((k): k is Kid => k !== null)
+        .map((k) => ({ student_id: k.id, student_name: k.fullName })),
+    })
+  );
+
+  return {
+    mentions,
+    ambiguous,
+    general_notes: unredactPII(extract.general_notes ?? "", mappings),
+  };
+}

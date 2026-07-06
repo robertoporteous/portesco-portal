@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { mapMentionsToStudents } from "@/lib/ai/map-mentions";
+import {
+  mapMentionsToStudents,
+  buildConfirmationPayload,
+  resolveStudentRef,
+} from "@/lib/ai/map-mentions";
 import { redactPII, type Kid } from "@/lib/ai/redact";
 import {
   buildExtractionUserPrompt,
@@ -99,5 +103,83 @@ describe("mapMentionsToStudents — defensive skips (no bad rows reach the DB)",
       { student_ref: "el defensa", reason: "bad_token" },
       { student_ref: "[STUDENT_9]", reason: "index_out_of_range" },
     ]);
+  });
+});
+
+describe("resolveStudentRef — token → kid by roster index", () => {
+  it("resolves a valid token, rejects bad tokens and out-of-range indices", () => {
+    expect(resolveStudentRef("[STUDENT_2]", KIDS)).toEqual(KIDS[1]);
+    expect(resolveStudentRef(" [STUDENT_1] ", KIDS)).toEqual(KIDS[0]);
+    expect(resolveStudentRef("el defensa", KIDS)).toBeNull();
+    expect(resolveStudentRef("[STUDENT_9]", KIDS)).toBeNull();
+  });
+});
+
+describe("buildConfirmationPayload — resolved view for the confirmation modal (8.1)", () => {
+  const transcript =
+    "Ana Mendoza brilló. Carlos García flojo hoy. Buen ambiente de grupo.";
+  const prompt = buildExtractionUserPrompt(KIDS, transcript);
+  const { mappings } = redactPII(prompt, { kidsEnrolled: KIDS });
+
+  const extract: ExtractMentionsResult = {
+    mentions: [
+      {
+        student_ref: "[STUDENT_3]",
+        sentiment: "positive",
+        content_snippet: "[STUDENT_3] brilló.",
+        confidence: "high",
+      },
+      {
+        student_ref: "[STUDENT_1]",
+        sentiment: "concern",
+        content_snippet: "[STUDENT_1] flojo hoy.",
+        confidence: "medium",
+      },
+    ],
+    ambiguous: [
+      {
+        description: "el defensa central trabajó bien",
+        // Mix of valid + out-of-range + bad token: only the valid one survives.
+        candidate_student_refs: ["[STUDENT_2]", "[STUDENT_9]", "el chico nuevo"],
+      },
+    ],
+    general_notes: "Buen ambiente; felicité a [STUDENT_3].",
+  };
+
+  it("resolves mentions to real names + student_id with a stable idx", () => {
+    const p = buildConfirmationPayload(extract, KIDS, mappings);
+    expect(p.mentions).toHaveLength(2);
+    expect(p.mentions[0]).toMatchObject({
+      idx: 0,
+      student_id: "k3",
+      student_name: "Ana Mendoza",
+      snippet: "Ana Mendoza brilló.",
+      sentiment: "positive",
+      confidence: "high",
+    });
+    expect(p.mentions[1]).toMatchObject({
+      idx: 1,
+      student_id: "k1",
+      student_name: "Carlos García",
+      snippet: "Carlos García flojo hoy.",
+    });
+    // The human-facing view must never leak placeholders.
+    expect(JSON.stringify(p.mentions)).not.toContain("[STUDENT_");
+  });
+
+  it("resolves ambiguous candidates, dropping invalid refs", () => {
+    const p = buildConfirmationPayload(extract, KIDS, mappings);
+    expect(p.ambiguous).toHaveLength(1);
+    expect(p.ambiguous[0].idx).toBe(0);
+    expect(p.ambiguous[0].description).toBe("el defensa central trabajó bien");
+    expect(p.ambiguous[0].candidates).toEqual([
+      { student_id: "k2", student_name: "Sebastián Pérez" },
+    ]);
+  });
+
+  it("unredacts general_notes (may carry tokens)", () => {
+    const p = buildConfirmationPayload(extract, KIDS, mappings);
+    expect(p.general_notes).toBe("Buen ambiente; felicité a Ana Mendoza.");
+    expect(p.general_notes).not.toContain("[STUDENT_");
   });
 });

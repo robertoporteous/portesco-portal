@@ -14,7 +14,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { transcribeVoice } from "@/lib/ai/whisper";
 import { callClaude } from "@/lib/ai/claude";
-import { mapMentionsToStudents } from "@/lib/ai/map-mentions";
+import {
+  buildConfirmationPayload,
+  type ConfirmationPayload,
+} from "@/lib/ai/map-mentions";
 import type { Kid } from "@/lib/ai/redact";
 import {
   buildExtractionUserPrompt,
@@ -38,7 +41,10 @@ type RunArgs = {
 
 export type PipelineResult = {
   status: "pending_confirmation" | "transcription_failed" | "extraction_failed";
-  extractionJson?: ExtractMentionsResult;
+  // Vista RESUELTA (nombres reales, student_id, idx estable) para que el modal
+  // de confirmación (Tarea 8) abra directo desde la respuesta del POST. Flujo A:
+  // NO se insertan mention_assignments acá — eso pasa al confirmar (Tarea 9).
+  confirmation?: ConfirmationPayload;
   mentionCount?: number;
   ambiguousCount?: number;
   error?: string;
@@ -130,33 +136,30 @@ export async function runVoicePipeline(args: RunArgs): Promise<PipelineResult> {
     });
 
     const extract = claudeRes.output;
-    const { rows } = mapMentionsToStudents(
+    // Flujo A: resolvemos nombres server-side y persistimos la vista RESUELTA
+    // para que el modal de confirmación abra desde la respuesta del POST. NO
+    // insertamos mention_assignments acá — eso lo hace el confirm (Tarea 9). El
+    // trigger append_to_profile_observations es INSERT-only, así que el perfil
+    // del niño solo debe recibir menciones revisadas por un humano.
+    const confirmation = buildConfirmationPayload(
       extract,
       kidsEnrolled,
       claudeRes.redactionMappings
     );
 
-    if (rows.length > 0) {
-      const { error } = await supabase.from("mention_assignments").insert(
-        rows.map((row) => ({ ...row, observation_id: observationId }))
-      );
-      // El trigger append_to_profile_observations puebla profile_observations.
-      if (error) throw new Error(`mention_assignments insert: ${error.message}`);
-    }
-
     await supabase
       .from("class_observations")
       .update({
-        extraction_json: extract,
+        extraction_json: confirmation,
         extraction_status: "pending_confirmation",
       })
       .eq("id", observationId);
 
     return {
       status: "pending_confirmation",
-      extractionJson: extract,
-      mentionCount: rows.length,
-      ambiguousCount: extract.ambiguous?.length ?? 0,
+      confirmation,
+      mentionCount: confirmation.mentions.length,
+      ambiguousCount: confirmation.ambiguous.length,
     };
   } catch (err) {
     await supabase
