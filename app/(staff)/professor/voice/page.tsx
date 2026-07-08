@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatPanamaDate, formatPanamaTime } from "@/lib/dates";
 import { VoiceCapture } from "./voice-capture";
+import type { RosterKid } from "./confirmation-modal";
 
 // Professor voice capture (Bloque 3, Tarea 6 pieza 4) — recorder GRADUADO del
 // spike (Tarea 1) con hard cap de 8 min + tab Voz/Texto. CLIENT-ONLY: la subida
@@ -17,11 +18,12 @@ export default async function ProfessorVoicePage({
   const { session: sessionId } = await searchParams;
 
   let sessionLabel: string | undefined;
+  let roster: RosterKid[] = [];
   if (sessionId) {
     const supabase = await createClient();
     const { data: session } = await supabase
       .from("class_sessions")
-      .select("scheduled_start_at, activities!inner(name)")
+      .select("activity_id, scheduled_start_at, activities!inner(name)")
       .eq("id", sessionId)
       .maybeSingle();
     if (session) {
@@ -32,6 +34,22 @@ export default async function ProfessorVoicePage({
       ) as { name: string };
       const start = new Date(session.scheduled_start_at);
       sessionLabel = `${activity.name} · ${formatPanamaDate(start)} ${formatPanamaTime(start)}`;
+
+      // Roster para el picker de "reasignar" del modal (RLS: professor ve los
+      // enrolled de su actividad, igual que la vista de sesión). El confirm
+      // endpoint revalida contra el roster server-side, así que esto es solo UI.
+      const { data: enrollRows } = await supabase
+        .from("enrollments")
+        .select("student:students!inner(id, full_name)")
+        .eq("activity_id", session.activity_id)
+        .eq("status", "active");
+      roster = (enrollRows ?? []).map((r) => {
+        const s = (Array.isArray(r.student) ? r.student[0] : r.student) as {
+          id: string;
+          full_name: string;
+        };
+        return { student_id: s.id, student_name: s.full_name };
+      });
     }
   }
 
@@ -50,7 +68,11 @@ export default async function ProfessorVoicePage({
       </header>
 
       <div className="flex-1">
-        <VoiceCapture sessionId={sessionId} sessionLabel={sessionLabel} />
+        <VoiceCapture
+          sessionId={sessionId}
+          sessionLabel={sessionLabel}
+          roster={roster}
+        />
       </div>
     </div>
   );

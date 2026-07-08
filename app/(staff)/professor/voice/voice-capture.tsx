@@ -4,7 +4,9 @@ import { useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { ConfirmationPayload } from "@/lib/ai/map-mentions";
 import { VoiceRecorder, type RecordingPayload } from "./voice-recorder";
+import { ConfirmationModal, type RosterKid } from "./confirmation-modal";
 
 const TEXT_MAX = 2000;
 
@@ -14,6 +16,9 @@ type SubmitResult = {
     | "pending_confirmation"
     | "transcription_failed"
     | "extraction_failed";
+  // Vista resuelta server-side (Tarea 8.1). Presente en pending_confirmation:
+  // desde acá abre el modal de confirmación (realtime = fallback, Bloque 4).
+  confirmation?: ConfirmationPayload;
   mentionCount?: number;
   ambiguousCount?: number;
   error?: string;
@@ -26,9 +31,11 @@ type SubmitResult = {
 export function VoiceCapture({
   sessionId,
   sessionLabel,
+  roster = [],
 }: {
   sessionId?: string;
   sessionLabel?: string;
+  roster?: RosterKid[];
 }) {
   const [tab, setTab] = useState<"voz" | "texto">("voz");
   const [recording, setRecording] = useState<RecordingPayload | null>(null);
@@ -36,6 +43,9 @@ export function VoiceCapture({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmedCount, setConfirmedCount] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [captureKey, setCaptureKey] = useState(0); // remonta el recorder al re-grabar
 
   const hasContent = tab === "voz" ? !!recording : text.trim().length > 0;
   // Idempotencia: nada de re-enviar una vez procesado ok; sin sesión no se sube.
@@ -66,12 +76,30 @@ export function VoiceCapture({
         return;
       }
       setResult(json);
-      // No re-habilitamos: status final ya llegó (modal de confirmación = Tarea 8).
+      // Status final ya llegó. Si quedó pendiente de confirmar, abrimos el modal
+      // directo desde la respuesta (el payload resuelto viene en json.confirmation).
+      if (json.status === "pending_confirmation" && json.confirmation) {
+        setModalOpen(true);
+      }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error de red");
       setSubmitting(false);
     }
   }, [sessionId, submitting, done, tab, text, recording]);
+
+  // Re-grabar: descarta el intento y vuelve a la captura. La observación previa
+  // queda pending_confirmation (inerte — en flujo A no toca el perfil). Remonta
+  // el recorder (captureKey) para no arrastrar el blob anterior.
+  const rerecord = useCallback(() => {
+    setModalOpen(false);
+    setConfirmedCount(null);
+    setResult(null);
+    setRecording(null);
+    setText("");
+    setSubmitting(false);
+    setErrorMsg(null);
+    setCaptureKey((k) => k + 1);
+  }, []);
 
   return (
     <div className="flex flex-col gap-5">
@@ -101,7 +129,7 @@ export function VoiceCapture({
       </div>
 
       {tab === "voz" ? (
-        <VoiceRecorder onRecordingChange={setRecording} />
+        <VoiceRecorder key={captureKey} onRecordingChange={setRecording} />
       ) : (
         <div className="flex flex-col gap-2">
           <textarea
@@ -140,20 +168,44 @@ export function VoiceCapture({
         </div>
       )}
 
-      {/* Resultado del pipeline. El modal de confirmación (Tarea 8) abre desde
-          esta misma respuesta; acá mostramos un resumen mínimo. */}
-      {result && result.status === "pending_confirmation" && (
+      {/* Confirmada — data ya entró al perfil. */}
+      {confirmedCount !== null && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-          <p className="font-medium">Observación procesada</p>
+          <p className="font-medium">Observación confirmada</p>
           <p className="mt-1">
-            {result.mentionCount ?? 0} menciones detectadas
-            {result.ambiguousCount
-              ? ` · ${result.ambiguousCount} ambiguas`
-              : ""}{" "}
-            · pendiente de confirmación.
+            {confirmedCount === 0
+              ? "Sin menciones al perfil."
+              : `${confirmedCount} ${
+                  confirmedCount === 1
+                    ? "mención agregada"
+                    : "menciones agregadas"
+                } al perfil.`}
           </p>
         </div>
       )}
+
+      {/* Pendiente de confirmar con el modal cerrado — reabrir. */}
+      {result?.status === "pending_confirmation" &&
+        result.confirmation &&
+        confirmedCount === null &&
+        !modalOpen && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <p className="font-medium">Falta confirmar</p>
+            <p className="mt-1">
+              Revisá lo que entendí antes de que entre al perfil.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={() => setModalOpen(true)}
+            >
+              Revisar y confirmar
+            </Button>
+          </div>
+        )}
+
       {result &&
         (result.status === "transcription_failed" ||
           result.status === "extraction_failed") && (
@@ -165,6 +217,23 @@ export function VoiceCapture({
             </p>
             {result.error && <p className="mt-1 break-words">{result.error}</p>}
           </div>
+        )}
+
+      {result?.status === "pending_confirmation" &&
+        result.confirmation &&
+        confirmedCount === null && (
+          <ConfirmationModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            observationId={result.observationId}
+            payload={result.confirmation}
+            roster={roster}
+            onConfirmed={(count) => {
+              setConfirmedCount(count);
+              setModalOpen(false);
+            }}
+            onRerecord={rerecord}
+          />
         )}
     </div>
   );
