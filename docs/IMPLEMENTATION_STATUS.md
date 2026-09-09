@@ -279,3 +279,44 @@ End-to-end validation (Roberto, iPhone Safari, 2026-05-20):
   columns but the i18n runtime layer lands with Sprint 1.5 code.
 - No automated tests yet; CI is unconfigured.
 - PWA icons and service worker behavior still incomplete.
+
+## Sprint 2 Bloque 3 — closed (2026-09-08)
+
+Voice pipeline + confirmation loop (tasks 1-9). Verified end-to-end in
+production 2026-09-08: record → confirmation modal showed the correct
+mentions → Confirm → `status='confirmed'` → `mention_assignments =
+profile_observations = 2` (**flujo A**: the profile only receives
+human-confirmed mentions). Real run observation:
+`80234aad-857f-4e51-b7be-302495649ad3`. 100/100 tests green (run twice).
+Migration `0009` added (RLS: coordinator sees own-school staff). Full task
+breakdown and deferred items (Bloque 4: ThumbsFeedback, Kassandra's COLA,
+realtime recovery) live in `AGENTS.md` §8; the pre-launch adversarial code
+review gate lives in `AGENTS.md` §12 `GATE(voice-launch)`.
+
+### Pre-launch data cleanup — PENDING (do NOT delete anything yet)
+
+The voice pipeline leaves stuck / orphan rows behind that must be cleaned
+**before launch**. Recorded here so a future session runs the cleanup
+deliberately, not accidentally mid-sprint. **Nothing is deleted now.**
+
+- **`class_observations` rows stuck in `pending_*` states** (e.g.
+  `pending_confirmation`, `pending_extraction`) that were never confirmed
+  by a human. In flujo A these are **inert** — mentions are inserted only
+  on human confirm, so an unconfirmed row never contaminates a student
+  profile — but they are dead weight and should be swept pre-launch.
+  - Known stuck row: **`99d4d0bf`** in `pending_extraction` (extraction
+    never completed). Left in place intentionally as a diagnostic sample;
+    delete during the pre-launch sweep.
+- **Orphan audio blobs in the `voice-obs` Storage bucket.** Deleting a
+  `class_observations` row does **NOT** cascade to Storage — the DB
+  `ON DELETE CASCADE` graph never reaches the bucket (Storage objects are
+  not FK-linked to app tables). So every deleted/abandoned observation
+  leaves its uploaded audio orphaned in `voice-obs`. The pre-launch sweep
+  must reconcile the bucket against surviving `class_observations` and
+  delete blobs with no matching row.
+- **Sequencing for the sweep:** it depends on the Bloque 4 recovery work
+  (`DEBT(bloque-4)` in `AGENTS.md` §12 — a "pendientes de confirmar" view
+  or realtime that reopens the modal). Decide per stuck row whether it is
+  recoverable-and-wanted before deleting; only then delete the row **and**
+  its `voice-obs` blob together. Do not write a blind `DELETE ... WHERE
+  status LIKE 'pending_%'` without also clearing the paired audio.
