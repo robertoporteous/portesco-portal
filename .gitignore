@@ -40,3 +40,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# PII — data real de menores. NUNCA entra a git.
+# supabase/scripts/private/ : roster CSV de CIDMI + el SQL generado con nombres
+#   de niños (Sprint 3). Lo que se commitea es el GENERADOR
+#   (generate-cidmi-seed.ts) + su README, nunca su salida.
+# outputs/ : salidas de scripts ad-hoc (seguro escolar, etc.) que pueden llevar
+#   nombres de menores en xlsx/png. Fuera de todo sprint, pero un `git add -A`
+#   distraído las commitearía.
+supabase/scripts/private/
+outputs/
