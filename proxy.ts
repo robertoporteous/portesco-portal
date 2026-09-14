@@ -35,6 +35,7 @@ export async function proxy(request: NextRequest) {
 
   const isAdmin = profile.is_admin || profile.role === "admin";
   const isCoordinator = profile.role === "coordinator";
+  const isProfessor = profile.role === "professor";
   const isStaff =
     profile.role === "coordinator" || profile.role === "professor";
 
@@ -57,11 +58,23 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  // Professor surface (Bloque 3): professor + coordinator + admin enter; parent
-  // has none (→ /). Edge line behind (staff)/professor/layout.tsx — closes the
-  // Tarea 1 TODO where the layout guard was the only line.
-  if (pathname.startsWith("/professor") && !isAdmin && !isStaff) {
-    return redirectPreservingCookies(request, "/", supabaseResponse);
+  // Professor surface (voz): professor + admin SOLAMENTE.
+  //
+  // Bloque 3 dejaba entrar también al coordinator. Se cierra en Sprint 3 Tarea 6
+  // por GATE(voice-launch) (AGENTS.md §12): la voz está parqueada hasta el code
+  // review adversarial, y el piloto le da acceso real a una coordinadora
+  // (Kassandra). Con la regla vieja le alcanzaba con tipear /professor para
+  // llegar al grabador. El coordinator va a su propio surface, no a "/" (que es
+  // el dashboard del padre).
+  //
+  // Cuando se abra la COLA de Kassandra (Bloque 4, T11), esto se revierte — pero
+  // recién después de pasar el gate.
+  if (pathname.startsWith("/professor") && !isAdmin && !isProfessor) {
+    return redirectPreservingCookies(
+      request,
+      isCoordinator ? "/coordinator-pad" : "/",
+      supabaseResponse
+    );
   }
 
   if (pathname.startsWith("/staff") && !isAdmin && !isStaff) {

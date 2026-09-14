@@ -1,13 +1,19 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-// Professor surface auth gate (Bloque 3). Second line of defense — RLS is first,
-// proxy.ts is edge. Professor + coordinator + admin enter; parent → "/".
+// Professor surface auth gate. Second line of defense — RLS is first, proxy.ts
+// is edge. Professor + admin entran; coordinator → "/coordinator-pad";
+// parent → "/".
 //
-// NOTE (spike, Tarea 1): proxy.ts no gatea aún el prefijo /professor, así que
-// este layout es la única línea hasta Tarea 6 (cuando se agrega la regla al
-// proxy). Roberto prueba el spike logueado como ADMIN, nunca como Alexander
-// real (§6.6 higiene de métrica de adopción).
+// GATE(voice-launch) (AGENTS.md §12): Bloque 3 dejaba entrar al coordinator acá
+// y en proxy.ts. Se cerró en Sprint 3 Tarea 6, cuando el piloto le dio acceso
+// real a una coordinadora: la voz sigue parqueada hasta el code review
+// adversarial, y con la regla vieja a Kassandra le alcanzaba con tipear
+// /professor para llegar al grabador. Se revierte con la COLA de Bloque 4 (T11),
+// pero recién después de pasar el gate.
+//
+// Roberto prueba logueado como ADMIN, nunca como Alexander real (§6.6 higiene
+// de métrica de adopción).
 export default async function ProfessorLayout({
   children,
 }: {
@@ -29,10 +35,11 @@ export default async function ProfessorLayout({
     !!profile &&
     (profile.is_admin ||
       profile.role === "admin" ||
-      profile.role === "coordinator" ||
       profile.role === "professor");
 
-  if (!allowed) redirect("/");
+  if (!allowed) {
+    redirect(profile?.role === "coordinator" ? "/coordinator-pad" : "/");
+  }
 
   return <>{children}</>;
 }

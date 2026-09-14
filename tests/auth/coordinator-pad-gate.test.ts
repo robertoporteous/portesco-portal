@@ -196,9 +196,15 @@ describe.each(PATHS)('/coordinator-pad auth gate (proxy.ts) — $label', ({ path
   });
 });
 
-// Professor surface (Bloque 3) — the inverse gate: professor (its own surface)
-// + coordinator + admin enter; parent has none. Pins the new proxy.ts rule so a
-// refactor can't silently let parents reach minors' rosters under /professor.
+// Professor surface (voz) — professor + admin SOLAMENTE. Pins the proxy.ts rule
+// so a refactor can't silently let parents reach minors' rosters under
+// /professor, ni devolverle al coordinator el acceso al grabador.
+//
+// El caso del coordinator cambió en Sprint 3 Tarea 6: Bloque 3 lo dejaba entrar,
+// y el piloto CIDMI le dio acceso real a una coordinadora con GATE(voice-launch)
+// todavía cerrado (AGENTS.md §12). Si este test vuelve a pasar con
+// `toBeNull()`, la voz quedó expuesta: no lo "arregles" así — revertilo sólo
+// cuando se abra la COLA de Bloque 4, después del code review adversarial.
 describe('/professor auth gate (proxy.ts)', () => {
   const PROF_PATH = '/professor';
 
@@ -212,13 +218,18 @@ describe('/professor auth gate (proxy.ts)', () => {
     expect(pathname).toBeNull();
   });
 
-  it('coordinator → allowed through (no redirect)', async () => {
+  it('coordinator → redirected to /coordinator-pad (GATE(voice-launch))', async () => {
     const { pathname } = await gateFor(EMAILS.coordinator, PROF_PATH);
-    expect(pathname).toBeNull();
+    expect(pathname).toBe('/coordinator-pad');
   });
 
   it('admin → allowed through (no redirect)', async () => {
     const { pathname } = await gateFor(EMAILS.admin, PROF_PATH);
     expect(pathname).toBeNull();
+  });
+
+  it('coordinator → redirected from the voice recorder too, not just the index', async () => {
+    const { pathname } = await gateFor(EMAILS.coordinator, '/professor/voice');
+    expect(pathname).toBe('/coordinator-pad');
   });
 });
