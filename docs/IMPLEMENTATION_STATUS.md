@@ -322,7 +322,7 @@ deliberately, not accidentally mid-sprint. **Nothing is deleted now.**
   status LIKE 'pending_%'` without also clearing the paired audio.
 ---
 
-## Sprint 3 — Piloto CIDMI, solo asistencia (en curso)
+## Sprint 3 — Piloto CIDMI, solo asistencia (seed CERRADO 24 sep 2026 · el piloto arranca el 28)
 
 No construye producto. Pone el Coordinator Pad de Bloque 2 en manos de
 Kassandra Dos Santos con la data real de CIDMI. Todo lo que produjo son
@@ -342,13 +342,20 @@ Ventana del piloto: **28 sep – 23 oct 2026** (última clase viernes 23 oct).
 
 ### Qué se sembró en prod
 
-| | |
-|---|---|
-| Actividades | **13 creadas, 10 activas** |
-| Students | **162** (38 antes → +124 del roster) |
-| Enrollments | **172** en las 10 activas |
-| class_sessions | **72** (18 bloques semanales × 4 semanas) |
-| class_attendance | **0** — el día 1 arranca en cero |
+Verificado contra prod el 24 sep 2026, después del reset de DIA_1:
+
+| | | |
+|---|---|---|
+| Students en CIDMI | **162** | 38 antes → +124 del roster |
+| Actividades | **17 totales, 10 activas** | 13 de Sprint 3 (3 desactivadas por vacías) + 4 demo del seed 0003, inactivas |
+| Enrollments | **176 totales, 172 en las 10 activas** | los otros 4 cuelgan de las demo inactivas |
+| class_sessions | **73 totales, 72 del piloto** | la 73ª es la de junio de Bloque 3, intacta |
+| class_attendance | **0** | el día 1 arranca en cero |
+| class_eventualities | **0** | |
+| class_observations | **5** | todas de Bloque 3 sobre la sesión de junio |
+
+Ventana de sesiones: **lunes 28 sep 14:30 → viernes 23 oct 14:30** (hora de
+Panamá), 18 bloques semanales × 4 semanas.
 
 Modelo: **1 actividad = deporte × nivel** (Primaria / Secundaria). Las
 categorías U6…U18 NO son actividades: se derivan de `students.grade` vía
@@ -466,9 +473,13 @@ lo "simplifique" a un conteo de sesiones de auth más adelante.
 | 2 | `seed-activities-sprint-3.sql` | corrido (`7acdd0d`) |
 | 3 | `generate-cidmi-seed.ts` → `private/seed-cidmi-pilot-sprint-3.sql` | corrido (`1f3df3f`) |
 | 4 | `generate-class-sessions-sprint-3.sql` | corrido (`df34fd6`) |
-| 5 | `reset-dia1-sprint-3.sql` | mueve DIA_1 al 28 sep |
-| 6 | `cleanup-smoke-test-sprint-3.sql` | correr DESPUÉS del smoke y ANTES del día 1 |
+| 5 | `cleanup-smoke-test-sprint-3.sql` | corrido (`f24d04a`) — borró la asistencia del smoke |
+| 6 | `reset-dia1-sprint-3.sql` | corrido (`7e68db4`) — DIA_1 21 → 28 sep, + borrado de 362a8dbe |
 
-**Orden entre 5 y 6:** si el smoke se hizo sobre las clases de la semana del 21,
-corré **6 antes que 5**. El guard de 5 aborta si las sesiones a borrar tienen
-asistencia, y 6 es lo que la saca.
+Los dos últimos se corrieron en ese orden **a propósito**: el guard de
+`reset-dia1` aborta si las sesiones a borrar tienen datos, y el cleanup del smoke
+es lo que los saca. Si se reordenan, el reset para — que es lo que se quiere.
+
+**Para re-correr el piloto en otra escuela:** 1 y 2 son específicos de CIDMI; 3 es
+el generador y sirve con otro CSV; 4 necesita el horario de la escuela nueva en
+su bloque de `VALUES`. 5 y 6 son de este arranque y no se repiten.
