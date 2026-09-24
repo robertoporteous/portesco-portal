@@ -421,6 +421,43 @@ cerró el día: las 6 quedaron cerradas. Acentos y apóstrofes (`D'jilmar`,
 
 La asistencia de prueba se borra con `cleanup-smoke-test-sprint-3.sql`.
 
+### Data de prueba con nombres reales — observación 362a8dbe (borrada)
+
+El 22 sep 2026 Roberto probó el surface `/professor` **usando la sesión de
+Alexander Watson**, y quedó una `class_observations` (`362a8dbe`, `kind=text_group`,
+`"victor palumbo se porto mal"`) atribuida a Alexander en la DB. Data de prueba
+con el nombre de un alumno real (Victor Palumbo, 11vo).
+
+Se borró en `reset-dia1-sprint-3.sql` (paso 0), tras verificar
+`mention_assignments = 0` y `profile_observations = 0`: se había confirmado
+deseleccionando la única mención, así que el perfil del alumno nunca recibió
+nada. El row de `audit_logs` **se conserva** — la FK `related_observation_id` es
+`ON DELETE SET NULL` y AGENTS §3.3 no admite borrar el rastro de una call al LLM.
+
+Dos cosas que esto destapó:
+
+- **El cleanup del smoke no la veía.** `cleanup-smoke-test-sprint-3.sql` filtra
+  por autor (`marked_by`/`created_by`/`closed_by` = Roberto), y esa fila tenía
+  `author_id` = Alexander. Filtrar por autor sigue siendo lo correcto: es lo que
+  lo hace seguro de correr con Kassandra ya trabajando. El problema era probar
+  con la sesión de otro → regla nueva en `AGENTS.md` §9.
+- **El guard del reset evitó una pérdida silenciosa.**
+  `class_observations.session_id` es `ON DELETE CASCADE`: borrar la sesión se
+  habría llevado la observación sin avisar. Por eso el reset aborta si las
+  sesiones a borrar tienen datos, en vez de confiar en los conteos previos.
+
+### La métrica del día 14 NO se mide con logins
+
+`users.last_signed_in_at` **subcuenta el uso real.** Evidencia: Alexander tenía
+`last_sign_in_at` del 3 sep, y el 22 sep se escribió una observación con su
+sesión — el campo sólo se actualiza en un sign-in fresco (magic link), no cuando
+la cookie se refresca. Alguien puede usar el Portal semanas sin moverlo.
+
+Por eso la adopción de Kassandra se mide con **`class_attendance` (filas marcadas
+por ella) y `class_sessions.closed_at` (clases y días que cerró)**, no con
+conteos de login. Es lo que el PRD §6 ya pide; esto queda anotado para que nadie
+lo "simplifique" a un conteo de sesiones de auth más adelante.
+
 ### Scripts de este sprint, en orden
 
 | # | Script | Estado |

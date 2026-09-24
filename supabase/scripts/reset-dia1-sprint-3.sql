@@ -9,14 +9,38 @@
 --   del PRD §6 ("días con asistencia cerrada en el Pad").
 --
 -- QUÉ HACE, ATÓMICO (un solo BEGIN/COMMIT)
---   1. ABORTA si alguna de las 18 sesiones a borrar tiene asistencia,
---      eventualidades u observaciones de voz. Si tiene, alguien la usó: no es
---      descartable y hay que mirarla a mano.
---   2. Borra las 18 sesiones de la semana del 21 al 27 de septiembre.
---   3. Agrega la 4ª semana nueva (19 al 23 de octubre), para que la ventana
+--   1. Borra UNA observación de prueba concreta, por id (ver más abajo). Es la
+--      única excepción al guard del paso 2, y es explícita a propósito.
+--   2. ABORTA si queda cualquier OTRO dato en las 18 sesiones a borrar
+--      (asistencia, eventualidades u observaciones). Si hay, alguien las usó:
+--      no son descartables y hay que mirarlas a mano.
+--   3. Borra las 18 sesiones de la semana del 21 al 27 de septiembre.
+--   4. Agrega la 4ª semana nueva (19 al 23 de octubre), para que la ventana
 --      vuelva a ser de 4 semanas completas desde el nuevo DIA_1.
---   4. Verifica: 72 sesiones entre el 28 de septiembre y el 25 de octubre, y
+--   5. Verifica: 72 sesiones entre el 28 de septiembre y el 25 de octubre, y
 --      cero sesiones del piloto antes del 28.
+--
+-- LA OBSERVACIÓN QUE SE BORRA — 362a8dbe-b2f5-447c-bffc-b0c21577c633
+--   Autor en la DB: Alexander Watson (professor). En realidad la escribió
+--   ROBERTO el 22 sep 2026 probando CON LA SESIÓN de Alexander (confirmado por
+--   él, 24 sep). Es data de PRUEBA que quedó con el nombre de un alumno real
+--   (Victor Palumbo, 11vo), así que se borra en vez de preservarse.
+--
+--   Por qué es seguro:
+--     - mention_assignments = 0 (se confirmó deseleccionando la única mención;
+--       el confirm inserta con `if (rows.length > 0)`, así que cero es correcto).
+--     - profile_observations = 0 → el perfil del alumno nunca recibió nada.
+--     - El script VUELVE A VERIFICAR las dos cosas y aborta si no dan cero.
+--   El row de audit_logs NO se borra: la FK related_observation_id es
+--   ON DELETE SET NULL, así que la auditoría sobrevive con ese campo en NULL.
+--   Eso es deliberado (AGENTS.md §3.3: no se borra rastro de una call al LLM).
+--
+--   Por qué el cleanup del smoke no la vio: ese script filtra por autor
+--   (`marked_by`/`created_by`/`closed_by` = Roberto) y esta fila tiene
+--   author_id = Alexander. Filtrar por autor es lo correcto — es lo que lo hace
+--   seguro de correr con Kassandra ya trabajando — pero no alcanza cuando
+--   Roberto prueba con la sesión de otro. La regla que sale de esto está en
+--   AGENTS.md §9: no volver a probar con sesiones de usuarios reales.
 --
 -- ORDEN DE EJECUCIÓN — IMPORTA
 --   Si Roberto hizo el smoke manual sobre las clases de esta semana, corré
@@ -35,7 +59,42 @@
 BEGIN;
 
 -- ============================================================
--- 0. Pre-flight + guard: lo que se borra tiene que estar sin usar
+-- 0. Borrar la observación de prueba (excepción explícita, por id)
+-- ============================================================
+
+DO $$
+DECLARE
+  obs_id  uuid := '362a8dbe-b2f5-447c-bffc-b0c21577c633';
+  existe  boolean;
+  ment_n  int;
+  prof_n  int;
+BEGIN
+  SELECT EXISTS(SELECT 1 FROM class_observations WHERE id = obs_id) INTO existe;
+
+  IF NOT existe THEN
+    RAISE NOTICE 'La observación % ya no existe (re-run). Sigo.', obs_id;
+  ELSE
+    SELECT count(*) INTO ment_n FROM mention_assignments WHERE observation_id = obs_id;
+
+    SELECT count(*) INTO prof_n
+    FROM profile_observations po
+    JOIN mention_assignments ma ON ma.id = po.mention_id
+    WHERE ma.observation_id = obs_id;
+
+    IF ment_n > 0 OR prof_n > 0 THEN
+      RAISE EXCEPTION
+        'ABORTADO: la observación % tiene menciones (%) o filas de perfil (%). '
+        'Se confirmó y propagó al perfil de un menor: NO es descartable sin revisarla.',
+        obs_id, ment_n, prof_n;
+    END IF;
+
+    DELETE FROM class_observations WHERE id = obs_id;
+    RAISE NOTICE 'Observación de prueba % borrada (0 menciones, 0 filas de perfil).', obs_id;
+  END IF;
+END $$;
+
+-- ============================================================
+-- 1. Pre-flight + guard: lo que queda por borrar tiene que estar sin usar
 -- ============================================================
 
 DO $$
@@ -76,9 +135,10 @@ BEGIN
 
   IF att_n > 0 OR ev_n > 0 OR obs_n > 0 THEN
     RAISE EXCEPTION
-      'ABORTADO: las sesiones del 21-27 sep tienen datos (asistencia=%, eventualidades=%, '
-      'observaciones=%). Alguien las usó, así que no son descartables. Si es el smoke de '
-      'Roberto, corré primero cleanup-smoke-test-sprint-3.sql. Si no, miralas a mano.',
+      'ABORTADO: las sesiones del 21-27 sep todavía tienen datos (asistencia=%, '
+      'eventualidades=%, observaciones=%) más allá de la observación de prueba que el paso 0 '
+      'ya borró. Alguien más las usó: NO son descartables. Si es el smoke de Roberto, corré '
+      'cleanup-smoke-test-sprint-3.sql. Si no, identificá autor y fecha antes de borrar nada.',
       att_n, ev_n, obs_n;
   END IF;
 
@@ -90,7 +150,7 @@ BEGIN
 END $$;
 
 -- ============================================================
--- 1. Borrar la semana vieja (21-27 sep)
+-- 2. Borrar la semana vieja (21-27 sep)
 -- ============================================================
 
 DELETE FROM class_sessions cs
@@ -98,7 +158,7 @@ USING _a_borrar b
 WHERE cs.id = b.id;
 
 -- ============================================================
--- 2. Agregar la 4ª semana nueva, con DIA_1 = lunes 28 sep
+-- 3. Agregar la 4ª semana nueva, con DIA_1 = lunes 28 sep
 -- ============================================================
 -- Mismos 18 bloques semanales que generate-class-sessions-sprint-3.sql, con el
 -- DIA_1 corrido una semana. El guard WHERE NOT EXISTS hace que sólo entren las
@@ -153,7 +213,7 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================
--- 3. Verificación dura — rollback si algo no cuadra
+-- 4. Verificación dura — rollback si algo no cuadra
 -- ============================================================
 
 DO $$
@@ -209,7 +269,7 @@ BEGIN
 END $$;
 
 -- ============================================================
--- 4. Reporte visible en Studio
+-- 5. Reporte visible en Studio
 -- ============================================================
 
 WITH sc AS (SELECT id FROM schools WHERE slug = 'cidmi'),
