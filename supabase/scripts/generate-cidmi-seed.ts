@@ -173,8 +173,6 @@ const SPORTS_SOLO_PRIMARIA = ['Porrismo'];
 
 type Level = 'Primaria' | 'Secundaria';
 
-const SPORTS = ['Fútbol', 'Voleibol', 'Basketball', 'Baile Urbano', 'Flag Football', 'Porrismo', 'Ajedrez'];
-
 const ACTIVITIES: string[] = [
   'Fútbol Primaria', 'Voleibol Primaria', 'Basketball Primaria', 'Baile Urbano Primaria',
   'Flag Football Primaria', 'Porrismo Primaria', 'Ajedrez Primaria',

@@ -233,3 +233,44 @@ describe('/professor auth gate (proxy.ts)', () => {
     expect(pathname).toBe('/coordinator-pad');
   });
 });
+
+// /staff — el stub "Panel del Profesor — Próximamente" de Sprint 1.
+//
+// El coordinator se manda a /coordinator-pad: no es una restricción de permisos
+// (no hay nada sensible en un stub), es que ahí no hay nada para ella. Durante
+// el piloto CIDMI cualquier pantalla vacía es una excusa para volver a la
+// planilla, y el magic link de Kassandra tiene que caer donde están sus clases.
+//
+// Admin y professor siguen entrando: admin porque puede querer ver el stub,
+// professor porque es su surface.
+describe('/staff auth gate (proxy.ts)', () => {
+  const STAFF_PATH = '/staff';
+
+  it('coordinator → redirected to /coordinator-pad', async () => {
+    const { pathname } = await gateFor(EMAILS.coordinator, STAFF_PATH);
+    expect(pathname).toBe('/coordinator-pad');
+  });
+
+  it('coordinator → redirected from nested /staff routes too', async () => {
+    // Los stubs de Sprint 1: /staff/attendance, /staff/students, /staff/reports.
+    for (const path of ['/staff/attendance', '/staff/students', '/staff/reports']) {
+      const { pathname } = await gateFor(EMAILS.coordinator, path);
+      expect(pathname).toBe('/coordinator-pad');
+    }
+  });
+
+  it('professor → allowed through (no redirect): /staff es su surface', async () => {
+    const { pathname } = await gateFor(EMAILS.professor, STAFF_PATH);
+    expect(pathname).toBeNull();
+  });
+
+  it('admin → allowed through (no redirect)', async () => {
+    const { pathname } = await gateFor(EMAILS.admin, STAFF_PATH);
+    expect(pathname).toBeNull();
+  });
+
+  it('parent → redirected to /', async () => {
+    const { pathname } = await gateFor(EMAILS.parent, STAFF_PATH);
+    expect(pathname).toBe('/');
+  });
+});

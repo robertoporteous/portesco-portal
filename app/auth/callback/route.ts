@@ -36,7 +36,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.redirect(`${origin}${destination}`);
 }
 
-function resolveDestination(
+// Exportada para poder testearla sin levantar el server: es pura.
+export function resolveDestination(
   profile: { role: string | null; is_admin: boolean | null } | null
 ): string {
   if (!profile) return "/";
@@ -44,7 +45,12 @@ function resolveDestination(
   switch (profile.role) {
     case "admin":
       return "/admin";
+    // El coordinator cae en su propio surface. Antes iba a /staff, que es el
+    // stub "Panel del Profesor — Próximamente" de Sprint 1: una coordinadora
+    // entrando por magic link llegaba a una pantalla vacía en vez de a sus
+    // clases del día (Sprint 3, piloto CIDMI).
     case "coordinator":
+      return "/coordinator-pad";
     case "professor":
       return "/staff";
     case "parent":

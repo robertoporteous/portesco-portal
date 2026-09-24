@@ -77,8 +77,20 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  if (pathname.startsWith("/staff") && !isAdmin && !isStaff) {
-    return redirectPreservingCookies(request, "/", supabaseResponse);
+  // /staff es el stub "Panel del Profesor — Próximamente" de Sprint 1.
+  //   admin     → pasa (puede querer ver el stub)
+  //   professor → pasa (es su surface)
+  //   coordinator → /coordinator-pad. No es una restricción de permisos: es que
+  //     ahí no hay nada para ella, y durante el piloto CIDMI cualquier pantalla
+  //     vacía es una excusa para volver a la planilla.
+  //   parent    → "/"
+  if (pathname.startsWith("/staff") && !isAdmin) {
+    if (isCoordinator) {
+      return redirectPreservingCookies(request, "/coordinator-pad", supabaseResponse);
+    }
+    if (!isStaff) {
+      return redirectPreservingCookies(request, "/", supabaseResponse);
+    }
   }
 
   return supabaseResponse;
