@@ -400,6 +400,27 @@ la COLA de Bloque 4 (T11), pero recién después del code review adversarial.
 No hay ningún `href` a `/professor` ni `/voice` fuera del propio surface: el
 vector era la URL tipeada, no la UI.
 
+### Lista de mejoras cosméticas — evaluar el día 14 (PRD §5)
+
+No se tocan durante el piloto. Se anotan cuando aparecen y se deciden con las
+métricas en mano.
+
+- **El label "N enrolled" está en inglés en una UI en español.** Detectado en el
+  smoke manual del 24 sep 2026 (Roberto, como admin, en el Coordinator Pad).
+  Cosmético, no bloquea pasar asistencia. Al arreglarlo, revisar si hay otros
+  strings sueltos en inglés en el mismo surface antes de tocar uno solo.
+
+### Smoke manual — hecho (24 sep 2026)
+
+Roberto como admin, Chrome. `/coordinator-pad` mostró las 6 clases del jueves
+con los conteos exactos (Baile Urbano 13 · Voleibol Prim 12 · Basketball Prim 9
+· Flag Football Prim 3 · Fútbol Sec 43 · Voleibol Sec 18). Marcó asistencia y
+una eventualidad en Flag Football Primaria, cerró / reabrió / cerró la clase, y
+cerró el día: las 6 quedaron cerradas. Acentos y apóstrofes (`D'jilmar`,
+`Tomás D'Medeiros`) se renderizan bien.
+
+La asistencia de prueba se borra con `cleanup-smoke-test-sprint-3.sql`.
+
 ### Scripts de este sprint, en orden
 
 | # | Script | Estado |
