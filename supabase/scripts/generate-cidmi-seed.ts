@@ -892,6 +892,31 @@ function buildPendientes(plan: Plan): string {
     L.push(`| ${s.fullName} | ${s.activities.join(' · ')} |`);
   }
   L.push('');
+
+  // Nota operativa para Roberto. Vive acá y no en el .md a mano: el .md es
+  // generado, así que una nota escrita ahí se pierde en la próxima corrida.
+  L.push('## 6 · Nota para Roberto: el primer "Enviar" post-deploy en Safari iOS');
+  L.push('');
+  L.push('Si en el **primer** intento después de un deploy Kassandra ve');
+  L.push('`"The string did not match the expected pattern"` o `"Load failed"`');
+  L.push('en Safari del iPhone: **es transitorio, no es un bug.** Que reintente');
+  L.push('el mismo botón y va a andar.');
+  L.push('');
+  L.push('Causa (AGENTS.md §9, incidente del 15 jun 2026): es el primer `fetch`');
+  L.push('contra una Function recién desplegada — cold start + handshake de red del');
+  L.push('WebView. `"Load failed"` es el `TypeError` genérico de `fetch` en WebKit');
+  L.push('cuando la request se aborta a nivel red, no un error de la aplicación.');
+  L.push('Se auditó en git: no hay ningún commit que introduzca o maneje esos');
+  L.push('strings, y no se volvió a reproducir.');
+  L.push('');
+  L.push('**No abras un bug por esto** salvo que sea REPRODUCIBLE: que falle en los');
+  L.push('reintentos, o en requests que no son el primero post-deploy. Ahí sí mirá');
+  L.push('el status HTTP real y el body del POST.');
+  L.push('');
+  L.push('Cuenta como bloqueo para la métrica del día 14 **sólo si Kassandra no');
+  L.push('puede seguir después de reintentar.** Un reintento que funciona no es un');
+  L.push('bloqueo — no lo sumes a los "≤ 2 bloqueos que requirieron a Roberto".');
+  L.push('');
   return L.join('\n');
 }
 
