@@ -320,3 +320,97 @@ deliberately, not accidentally mid-sprint. **Nothing is deleted now.**
   recoverable-and-wanted before deleting; only then delete the row **and**
   its `voice-obs` blob together. Do not write a blind `DELETE ... WHERE
   status LIKE 'pending_%'` without also clearing the paired audio.
+---
+
+## Sprint 3 — Piloto CIDMI, solo asistencia (en curso)
+
+No construye producto. Pone el Coordinator Pad de Bloque 2 en manos de
+Kassandra Dos Santos con la data real de CIDMI. Todo lo que produjo son
+scripts en `supabase/scripts/` + docs.
+
+### DIA_1 = lunes 28 de septiembre de 2026
+
+**Movido desde el 21 de septiembre** (`reset-dia1-sprint-3.sql`, 24 sep 2026).
+Las sesiones se habían generado con DIA_1 = 21 sep, pero el piloto no arrancó:
+Kassandra nunca entró (último login 5 jun 2026) y la semana del 21 al 25 pasó
+sin una sola marca de asistencia. Esas 18 sesiones se borraron y se agregó la
+semana del 19 al 23 de octubre, para que la ventana siga siendo de 4 semanas
+completas. Dejarlas habría arrancado la métrica del PRD §6 con tres días de
+clases nunca cerradas.
+
+Ventana del piloto: **28 sep – 23 oct 2026** (última clase viernes 23 oct).
+
+### Qué se sembró en prod
+
+| | |
+|---|---|
+| Actividades | **13 creadas, 10 activas** |
+| Students | **162** (38 antes → +124 del roster) |
+| Enrollments | **172** en las 10 activas |
+| class_sessions | **72** (18 bloques semanales × 4 semanas) |
+| class_attendance | **0** — el día 1 arranca en cero |
+
+Modelo: **1 actividad = deporte × nivel** (Primaria / Secundaria). Las
+categorías U6…U18 NO son actividades: se derivan de `students.grade` vía
+`lib/categories.ts`.
+
+`Fútbol U14-U18` (Sprint 2) se renombró a `Fútbol Secundaria` conservando su id
+`ec65a576-af31-4b37-8640-a57a21895668`, sus 36 enrollments y el
+`staff_activities` de Alexander.
+
+### 3 actividades desactivadas por quedar sin un solo niño
+
+`Basketball Secundaria`, `Baile Urbano Secundaria`, `Flag Football Secundaria`
+→ `is_active = false`. Ningún niño del roster mapea a ellas, y en la planilla de
+asistencia esos grupos no tuvieron una sola X en todo 2026: no arrancaron.
+La generación de sesiones filtra por `is_active`, así que a Kassandra no le
+aparecen clases vacías. Se reactivan con el addendum del generador si confirma
+que existen (el addendum prende la actividad antes de insertar).
+
+### Pendientes con Kassandra
+
+Viven en `supabase/scripts/private/pendientes-kassandra.md` — **generado, no
+commiteado** (PII). Lo regenera `generate-cidmi-seed.ts`. Secciones:
+
+- **§0** las 3 actividades desactivadas.
+- **§1** 2 niños que no se insertaron: no resolvían nivel (sin categoría, sin
+  grado y fuera de la whitelist de la regla (c)).
+- **§2** 3 a confirmar: un caso de Porrismo en 7mo forzado a Primaria porque
+  `Porrismo Secundaria` no existe; un grado en conflicto entre prod y el CSV; y
+  un student de prod que no está en el roster y se dejó intacto a propósito
+  (borrar un niño real es más caro que un fantasma en la lista unos días).
+- **§3** conteos por actividad para cruzar contra su lista. Voleibol y
+  Baloncesto quedaron por debajo del cruce del horario; el delta entra por el
+  addendum, sin tocar el seed.
+- **§5** 39 niños con `grade = 'Sin grado'`. `students.grade` es `text NOT NULL`
+  sin CHECK, y **no se inventó** un grado desde el nivel ni la categoría.
+  `categoryForGrade()` los agrupa en "Otros".
+- **§6** nota operativa: el primer "Enviar" post-deploy en Safari iOS puede
+  tirar un error transitorio (AGENTS §9) — reintentar, y no contarlo como
+  bloqueo de la métrica si el reintento funciona.
+
+### GATE(voice-launch) — cerrado más fuerte que antes
+
+Bloque 3 dejaba entrar al **coordinator** al surface `/professor` (en `proxy.ts`
+y en el layout), con un test que lo fijaba. Se cerró a **professor + admin**
+(commit `21aac83`): el piloto le da acceso real a una coordinadora y con la regla
+vieja le alcanzaba tipear `/professor` para llegar al grabador. Se revierte con
+la COLA de Bloque 4 (T11), pero recién después del code review adversarial.
+
+No hay ningún `href` a `/professor` ni `/voice` fuera del propio surface: el
+vector era la URL tipeada, no la UI.
+
+### Scripts de este sprint, en orden
+
+| # | Script | Estado |
+|---|---|---|
+| 1 | `cleanup-cidmi-pre-pilot.sql` | corrido (`4f581c8`) |
+| 2 | `seed-activities-sprint-3.sql` | corrido (`7acdd0d`) |
+| 3 | `generate-cidmi-seed.ts` → `private/seed-cidmi-pilot-sprint-3.sql` | corrido (`1f3df3f`) |
+| 4 | `generate-class-sessions-sprint-3.sql` | corrido (`df34fd6`) |
+| 5 | `reset-dia1-sprint-3.sql` | mueve DIA_1 al 28 sep |
+| 6 | `cleanup-smoke-test-sprint-3.sql` | correr DESPUÉS del smoke y ANTES del día 1 |
+
+**Orden entre 5 y 6:** si el smoke se hizo sobre las clases de la semana del 21,
+corré **6 antes que 5**. El guard de 5 aborta si las sesiones a borrar tienen
+asistencia, y 6 es lo que la saca.

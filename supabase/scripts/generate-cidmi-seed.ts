@@ -93,6 +93,18 @@ const MAX_PENDIENTES = 5;
  */
 const SIN_GRADO = 'Sin grado';
 
+/**
+ * DIA_1 del piloto, para el encabezado de pendientes-kassandra.md.
+ *
+ * Movido del lunes 21 al lunes 28 de septiembre de 2026 (reset-dia1-sprint-3.sql,
+ * 24 sep 2026): las sesiones se habían generado con DIA_1 = 21 sep, pero el
+ * piloto no arrancó — Kassandra nunca entró y esa semana pasó sin una sola marca
+ * de asistencia. Si cambia de nuevo, se cambia acá y en
+ * generate-class-sessions-sprint-3.sql (CTE `params`).
+ */
+const DIA_1_LABEL = 'lunes 28 de septiembre de 2026';
+const VENTANA_LABEL = '28 sep - 23 oct 2026 (4 semanas, última clase viernes 23 oct)';
+
 // ═════════════════════════════════════════════════════════════════════════════
 // OVERRIDES — decisiones de Roberto, 13 sep 2026. No inferir, no ampliar.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -804,6 +816,8 @@ function buildPendientes(plan: Plan): string {
   L.push('');
   L.push(`> Generado ${new Date().toISOString().slice(0, 10)} por \`supabase/scripts/generate-cidmi-seed.ts\`.`);
   L.push('> ⚠️ PII: nombres de menores. Este archivo NO se commitea.');
+  L.push('');
+  L.push(`**DIA_1 del piloto: ${DIA_1_LABEL}.** Ventana: ${VENTANA_LABEL}.`);
   L.push('');
   const vacias = ACTIVITIES.filter((a) => (porActividad.get(a) ?? 0) === 0);
   if (vacias.length) {
