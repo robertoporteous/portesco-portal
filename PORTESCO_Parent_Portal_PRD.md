@@ -1,5 +1,7 @@
 # PORTESCO Parent Portal — Product Requirements Document
 
+> **PRD v1 (abril 2026) — reemplazado en arquitectura y flujo por el Plan v2.0** (`tech-lab-vision-ai-native.md`) y por `PORTAL_CONTEXT.md`. Sigue vigente como diseño de pantallas de los Módulos A (padre) y C (admin). El Módulo B (profesor llena formulario mensual, profesor toma asistencia) NO aplica: la coordinadora toma asistencia y el profesor observa por voz. Nota agregada 28 sep 2026.
+
 ## Overview
 
 Build a multi-tenant SaaS web application (PWA-ready) for PORTESCO Sports S.A., a Panama-based company that manages extracurricular activity (ECA) programs for 15+ private schools with 1,200+ students. The platform serves three user types: parents, coordinators/professors, and the admin (Roberto, Director Ejecutivo).

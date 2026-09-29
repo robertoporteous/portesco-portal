@@ -284,6 +284,8 @@ If a session is supposed to work on a specific sprint, Roberto will paste the co
 
 ## 10 · References (read before deep work)
 
+**`PORTAL_CONTEXT.md` (raíz del repo) es la fuente única de verdad de estado, sprint actual, decisiones y vocabulario. Leelo ANTES que cualquiera de los archivos de abajo. Si este AGENTS.md y PORTAL_CONTEXT.md se contradicen, gana PORTAL_CONTEXT.md y se corrige este.** (28 sep 2026)
+
 Files outside this repo (in Roberto's Cowork Tech Lab folder):
 
 - `tech-lab-vision-ai-native.md` — full Plan v2.0 strategy
