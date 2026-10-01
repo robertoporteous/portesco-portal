@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPanamaTime, panamaTodayRange } from "@/lib/dates";
 import type { EventType } from "@/lib/types";
+import { rel } from "@/lib/parent-attendance";
 
 // Calendario (Sprint 4 T3) — eje "mi colegio" + eje "mi hijo" en una vista.
 //   · Banner "Hoy": prácticas y eventos de hoy (Panamá).
@@ -17,7 +18,7 @@ type Activity = {
   id: string; name: string;
   days_of_week: string[] | null; start_time: string | null; end_time: string | null;
 };
-type Student = { id: string; full_name: string; school_id: string; enrollments: { activities: Activity[] }[] };
+type Student = { id: string; full_name: string; school_id: string; enrollments: { activities: Activity | Activity[] }[] };
 type EventRow = {
   id: string; school_id: string; title: string; description: string | null; event_type: EventType;
   starts_at: string; ends_at: string | null; location: string | null;
@@ -59,7 +60,8 @@ function panamaDayKey(d: Date): string {
 }
 
 function dayHeading(d: Date): string {
-  return new Intl.DateTimeFormat("es-PA", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(d);
+  const s = new Intl.DateTimeFormat("es-PA", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(d);
+  return s.charAt(0).toUpperCase() + s.slice(1); // "Miércoles, 30 de septiembre"
 }
 
 function shortTime(t: string | null): string {
@@ -96,7 +98,7 @@ export default async function CalendarPage() {
   const kidsByActivity = new Map<string, string[]>();
   for (const s of students) {
     for (const e of s.enrollments) {
-      for (const a of e.activities) {
+      for (const a of rel(e.activities)) {
         activityById.set(a.id, a);
         kidsByActivity.set(a.id, [...(kidsByActivity.get(a.id) ?? []), s.full_name.split(" ")[0]]);
       }
@@ -214,7 +216,7 @@ export default async function CalendarPage() {
         ) : (
           Array.from(byDay.values()).map(({ date, items: dayItems }) => (
             <div key={panamaDayKey(date)} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <p className="px-4 pt-3 pb-1 text-sm font-semibold capitalize text-gray-900">
+              <p className="px-4 pt-3 pb-1 text-sm font-semibold text-gray-900">
                 {dayHeading(date)}
               </p>
               <ul className="divide-y divide-gray-100">

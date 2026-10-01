@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPanamaDate, formatPanamaTime } from "@/lib/dates";
 import {
+  rel,
   ATTENDED,
   STATUS_DISPLAY,
   panamaMonthName,
@@ -19,7 +20,7 @@ import type { AttendanceStatus } from "@/lib/types";
 // (Bloque 4): el bloque de abajo lo dice tal cual, sin inventar datos.
 
 type Activity = { id: string; name: string; schedule: string | null };
-type Enrollment = { id: string; activities: Activity[] };
+type Enrollment = { id: string; activities: Activity | Activity[] };
 type Student = { id: string; full_name: string; grade: string; enrollments: Enrollment[] };
 
 const LAST_N = 10;
@@ -65,7 +66,7 @@ export default async function ProgressPage({
   }
 
   const activities = selected.enrollments
-    .flatMap((e) => e.activities)
+    .flatMap((e) => rel(e.activities))
     .sort((a, b) => a.name.localeCompare(b.name));
   const activityIds = activities.map((a) => a.id);
 

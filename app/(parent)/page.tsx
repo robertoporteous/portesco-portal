@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatPanamaNextSession } from "@/lib/dates";
 import {
+  rel,
   monthSummaryFor,
   nextSessionFor,
   panamaMonthName,
@@ -22,8 +23,8 @@ type Activity = {
 
 type Enrollment = {
   id: string;
-  // Supabase types FK joins as arrays even when the FK is single-valued.
-  activities: Activity[];
+  // Supabase returns the to-one embed as an object at runtime; always wrap with rel().
+  activities: Activity | Activity[];
 };
 
 type Student = {
@@ -93,7 +94,7 @@ export default async function ParentHomePage() {
   // every kid, one for this month's attendance rows. RLS (0010) already scopes
   // both to this parent; the activity_id filter only keeps the payload small.
   const activityIds = Array.from(
-    new Set(students.flatMap((s) => s.enrollments.flatMap((e) => e.activities.map((a) => a.id))))
+    new Set(students.flatMap((s) => s.enrollments.flatMap((e) => rel(e.activities).map((a) => a.id))))
   );
   const now = new Date();
   const month = panamaMonthRange(now);
@@ -137,14 +138,14 @@ export default async function ParentHomePage() {
       ) : (
         <div className="flex flex-col gap-4">
           {students.map((student) => {
-            const ids = new Set(student.enrollments.flatMap((e) => e.activities.map((a) => a.id)));
+            const ids = new Set(student.enrollments.flatMap((e) => rel(e.activities).map((a) => a.id)));
             const sessionsInMonth = sessions.filter(
               (s) => new Date(s.scheduled_start_at) < month.end
             );
             const summary = monthSummaryFor(ids, student.id, sessionsInMonth, attendance);
             const next = nextSessionFor(ids, sessions, now);
             const nextActivity = next
-              ? student.enrollments.flatMap((e) => e.activities).find((a) => a.id === next.activity_id)
+              ? student.enrollments.flatMap((e) => rel(e.activities)).find((a) => a.id === next.activity_id)
               : null;
             return (
               <StudentCard
@@ -178,7 +179,7 @@ function StudentCard({
   nextLabel: string | null;
 }) {
   const activities = student.enrollments
-    .flatMap((e) => e.activities)
+    .flatMap((e) => rel(e.activities))
     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
 
   return (

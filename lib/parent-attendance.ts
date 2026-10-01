@@ -15,6 +15,16 @@ import type { AttendanceStatus } from "@/lib/types";
 
 const TZ = "America/Panama";
 
+/**
+ * Supabase embeds a to-one FK as an object at runtime but types it loosely; a
+ * to-many as an array. Normalize either into an array so .map/.flatMap never
+ * blow up (Sprint 4 T2 incident: `e.activities.map is not a function`).
+ */
+export function rel<T>(x: T | T[] | null | undefined): T[] {
+  if (x == null) return [];
+  return Array.isArray(x) ? x : [x];
+}
+
 /** [start, end) of the current calendar month in Panama, as absolute Dates. */
 export function panamaMonthRange(now = new Date()): { start: Date; end: Date } {
   const parts = new Intl.DateTimeFormat("en-CA", {
