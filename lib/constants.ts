@@ -1,6 +1,6 @@
 // App-wide constants — metric templates, categories, grades, etc.
 
-import type { ActivityCategory } from "./types";
+import type { ActivityCategory, EventType, NewsKind } from "./types";
 
 // Panama timezone used for all timestamps
 export const PANAMA_TIMEZONE = "America/Panama";
@@ -56,6 +56,26 @@ export const EVENT_TYPE_CONFIG = {
   meeting: { label: "Reunión", color: "#6366F1" },
   deadline: { label: "Fecha límite", color: "#EF4444" },
 } as const;
+
+// Labels alineados a los enums de 0010 (event_type / news_kind). Para pantallas
+// admin y feeds; EVENT_TYPE_CONFIG arriba es anterior y trae 'deadline' que
+// NO existe en el enum — no usarlo para escribir.
+export const EVENT_TYPE_LABEL: Record<EventType, string> = {
+  match: "Partido",
+  tournament: "Torneo",
+  practice: "Práctica",
+  festival: "Festival",
+  meeting: "Reunión",
+  other: "Evento",
+};
+
+export const NEWS_KIND_LABEL: Record<NewsKind, string> = {
+  announcement: "Anuncio",
+  result: "Resultado",
+  photo: "Foto",
+  promo: "Promoción",
+  payment_reminder: "Recordatorio de pago",
+};
 
 // Attendance status labels — keys mirror the attendance_status enum (0006).
 export const ATTENDANCE_LABELS = {
