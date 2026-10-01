@@ -5,6 +5,76 @@ Cambios por sprint/bloque, en orden inverso. Lo detallado de ingeniería vive en
 
 ---
 
+## Sprint 4 — Preview Tech Week (lado padre v1) · 28–30 sep 2026 (en curso, demo 11 oct)
+
+Primer sprint del **Concierge** (lado padre), construido en dos noches sobre un
+colegio ficticio y desplegado en `app.portescosports.com`. Nada de esto toca el
+Coordinator Pad ni a CIDMI. El piloto con Kassandra **no ha arrancado**.
+
+### Añadido
+
+- **Migración 0010**: tablas `events` y `news_items` (con columnas bilingües),
+  helper `parent_child_school_ids()`, y 9 policies: el padre lee eventos y
+  noticias publicados de las escuelas de sus hijos, las sesiones de las
+  actividades de sus hijos, la asistencia **solo** de sus propios hijos y el
+  catálogo activo de actividades de su colegio. Admin y coordinadora escriben.
+- **Inicio del padre**: por hijo, "Asistencia de <mes>: X de Y" (clases cerradas
+  vs presente/tarde) y "Próxima práctica".
+- **Avance**: selector de hijo, barra de asistencia del mes por actividad y las
+  últimas 10 clases con estado. Bloque honesto para el reporte quincenal
+  (Bloque 4).
+- **Calendario**: banner "Hoy", próximos 30 días mezclando eventos del colegio y
+  prácticas de los hijos (colores por tipo), horario semanal.
+- **Noticias**: feed del colegio con 5 tipos de card (resultado con marcador,
+  anuncio, foto, promo, recordatorio de pago), link externo (tienda).
+- **Perfil**: hijos con colegio y grado, sección Pago (Yappy + cuenta bancaria
+  con botón copiar, "hasta el 10 de cada mes"), cerrar sesión.
+- **Bottom nav** con links reales y estado activo; **PWA** instalable (manifest,
+  iconos placeholder, modo standalone en iOS).
+- **Admin overview**: colegios, estudiantes, asistencia 7 días, clases cerradas
+  hoy, tabla por colegio. Solo conteos.
+- **Acceso demo**: `supabase/scripts/demo-login-link.ts` genera un link de un
+  solo uso para `demo-padre | padre2 | coord | prof`; `/auth/enter` muestra un
+  botón para que la vista previa de WhatsApp no gaste el token; `/auth/callback`
+  acepta `token_hash`.
+- **Colegio Demo Portesco** (slug `demo`): 4 users, 4 estudiantes inventados, 6
+  actividades, 66 sesiones, asistencia, 6 eventos, 6 noticias. Scripts
+  `create-demo-users.ts`, `seed-demo-school.sql`, `seed-demo-feed.sql`,
+  `cleanup-demo-school.sql`.
+
+### Cambiado
+
+- El profesor cae en `/professor` tras el login (antes: stub `/staff`).
+- `lib/types.ts`: `Event`, `NewsItem`, `EventType`, `NewsKind`, `BilingualColumns`.
+- Coordinator Pad: "N enrolled" → "N inscritos".
+
+### Conocido
+
+- Iconos de la PWA son placeholder (azul/rojo con "P"); falta el logo real.
+- El link de acceso demo abierto desde el iPhone aún no se confirmó (30 sep).
+- Guard de tests contra prod retirado hasta que exista `portesco-dev`.
+
+### Decisiones técnicas tomadas
+
+- Sin `portesco-dev` este sprint; el demo vive en un colegio ficticio del mismo
+  proyecto para que ningún rol demo vea un nombre real.
+- `demo` → `main` al cierre de cada tarea; el demo se muestra en el dominio real.
+- `rel()` normaliza embeds to-one de Supabase (objeto vs array) — causa de un
+  crash en las tres pantallas nuevas.
+
+### Verificación
+
+- 127/127 tests (7 nuevos de RLS del padre, con control positivo y
+  "padre no puede escribir"). Las 5 pantallas del padre verificadas en Chrome
+  como `demo-padre` contra datos reales del colegio demo.
+
+### Próximos pasos
+
+- T7: logo real, re-correr `seed-demo-school.sql` antes del 11 para que "hoy"
+  tenga clases, smoke en iPhone, Loom de respaldo.
+
+---
+
 ## Sprint 3 — Piloto CIDMI, solo asistencia · 24 sep 2026
 
 Sprint sin producto nuevo: pone el Coordinator Pad de Sprint 2 Bloque 2 en manos

@@ -2,7 +2,7 @@
 
 > **Léelo primero, siempre.** Cualquier agente (Portal Agent en Cowork, Claude Code, Codex, Cursor) arranca aquí. Después va a `AGENTS.md` (reglas de código) y al brief del sprint. Este archivo reemplaza el "lee 5 archivos antes de cada brief" de los skills v2.0.
 > **Actualízalo al cerrar cada sesión** (sección 9). Si lo que dice aquí y lo que dice otro doc se contradicen, gana este archivo y se corrige el otro.
-> Última actualización: 28 sep 2026 · Roberto + Portal Agent
+> Última actualización: 30 sep 2026 (noche) · Portal Agent desde Cowork
 
 ---
 
@@ -37,11 +37,13 @@
 Tablas sin UI: `feedback_events`, `internal_alerts` (el trigger sí escribe), `bi_weekly_reports`, `wa_inbox`, `student_profiles` / `profile_observations` (sin lectura).
 No existe: `regions`, columnas bilingües (salvo las que agregue 0010), `events`, `news_items`, `consent_records`, `parent_child_relationships`.
 
+**Sprint 4 al 30 sep (noche), en `main` y desplegado en `app.portescosports.com`:** migración **0010** aplicada (`events`, `news_items`, 9 policies de padre, helper `parent_child_school_ids()`); lado padre completo — Inicio (asistencia del mes + próxima práctica por hijo), Avance, Calendario, Noticias, Perfil con Pago, bottom nav real, PWA instalable (iconos placeholder); `/auth/enter` + `demo-login-link.ts` para entrar como users demo; admin overview con conteos. Tests 127/127. Verificado en Chrome como `demo-padre`. **Pendiente T7:** logo real, re-seed antes del 11, smoke en iPhone (el link de acceso en el iPhone aún no se confirmó funcionando), Loom.
+
 ## 4 · Sprint actual: **Sprint 4 — Preview Tech Week (11 oct 2026)**
 
 **Objetivo:** el 9 oct hay un Portal demostrable en el iPhone de Roberto, con un colegio ficticio, donde se recorre padre → coordinadora → profesor (voz) → admin en 5 minutos.
 
-**Regla central (revisada 28-30 sep):** un solo proyecto Supabase (`itgxlrotwtjzxmaoqdah`, el actual) + rama **`demo`** en Vercel. El preview de `demo` usa las mismas env vars que production; `main` no se toca hasta después del 11 oct. **No se crea `portesco-dev` en este sprint.** El demo vive en un **colegio ficticio aparte, "Colegio Demo Portesco" (slug `demo`)**, dentro del mismo proyecto: 4 users `demo-*@portesco-test.com` (2 padres, 1 coordinadora, 1 profesor), 6 actividades, 4 estudiantes con nombres inventados, sesiones y asistencia propias. Se siembra con `supabase/scripts/create-demo-users.ts` + `seed-demo-school.sql` y se borra con `cleanup-demo-school.sql`. **CIDMI y Kassandra no se tocan.** Regla dura: ningún nombre de niño real aparece en el demo — por eso colegio aparte (el scope del coordinator es la escuela entera). Los eventos y noticias de T1 se siembran en el colegio demo copiando ligas/fechas reales de CIDMI (no es PII). `npm test` corre contra este proyecto (fixtures `__rlstest_*`, nunca borran fuera del prefijo).
+**Regla central (revisada 28-30 sep):** un solo proyecto Supabase (`itgxlrotwtjzxmaoqdah`, el actual) + rama **`demo`**, mergeada a **`main`** al cierre de cada tarea (decisión Roberto 30 sep: nadie usa `app.portescosports.com`, así que el demo se muestra ahí y no en un preview con SSO). **No se crea `portesco-dev` en este sprint.** El demo vive en un **colegio ficticio aparte, "Colegio Demo Portesco" (slug `demo`)**, dentro del mismo proyecto: 4 users `demo-*@portesco-test.com` (2 padres, 1 coordinadora, 1 profesor), 6 actividades, 4 estudiantes con nombres inventados, sesiones y asistencia propias. Se siembra con `supabase/scripts/create-demo-users.ts` + `seed-demo-school.sql` y se borra con `cleanup-demo-school.sql`. **CIDMI y Kassandra no se tocan.** Regla dura: ningún nombre de niño real aparece en el demo — por eso colegio aparte (el scope del coordinator es la escuela entera). Los eventos y noticias de T1 se siembran en el colegio demo copiando ligas/fechas reales de CIDMI (no es PII). `npm test` corre contra este proyecto (fixtures `__rlstest_*`, nunca borran fuera del prefijo).
 
 | SÍ (en orden) | NO (hasta después del 11 oct) |
 |---|---|
@@ -79,6 +81,7 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 | 24 sep 2026 | DIA_1 = 28 sep. Nadie prueba con usuarios reales |
 | 25 sep 2026 | Estudiante = sujeto, no usuario. Multi-region diferido al primer contrato fuera de Panamá. `portesco-dev` obligatorio antes de otro `npm test` |
 | 28 sep 2026 | Cambio de plan T0 (Roberto): **no se crea `portesco-dev`**; Sprint 4 usa el proyecto actual. El demo vive en un colegio ficticio aparte (slug `demo`) dentro del mismo proyecto, no dentro de CIDMI, para que ningún rol demo vea nombres reales. Guard de prod en `tests/_helpers/supabase.ts` diferido hasta que exista `portesco-dev`. Preview de `demo` con las mismas env vars que production |
+| 30 sep 2026 | El demo se despliega en `app.portescosports.com` (merge `demo` → `main`), no en preview de Vercel (SSO). Portal Agent construye directo desde Cowork en la Mac de Roberto; Roberto corre SQL en Studio, `npm test` y `git push`. |
 | 28 sep 2026 | Sprint 4 = preview para Tech Week en `portesco-dev` + rama `demo`. Lado padre = dos ejes (mi hijo / mi colegio). Este archivo es la fuente de verdad; vive en la raíz del repo |
 
 ## 8 · Preguntas abiertas
@@ -108,6 +111,8 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 | `README.md` del repo | — | **desactualizado** (dice Sprint 1 cerrado). No usar como fuente |
 
 ## 10 · Log de actualizaciones
+
+- 30 sep 2026 (noche) — T1-T6 construidos y en `main`. Límites del Portal Agent desde Cowork anotados: no corre `npm test`/`next build` (VM Linux vs node_modules Mac), no llega a Supabase, no hace push, no ejecuta SQL contra prod (bloqueo del clasificador). Esos 4 pasos son de Roberto.
 
 - 30 sep 2026 — T0 revisado: sin `portesco-dev`; demo en colegio ficticio aparte (`seed-demo-school.sql`); piloto CIDMI aún no arrancó.
 - 28 sep 2026 — creado. Sprint 4 definido. Decisiones del 25 y 28 sep registradas.

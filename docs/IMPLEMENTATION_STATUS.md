@@ -483,3 +483,70 @@ es lo que los saca. Si se reordenan, el reset para — que es lo que se quiere.
 **Para re-correr el piloto en otra escuela:** 1 y 2 son específicos de CIDMI; 3 es
 el generador y sirve con otro CSV; 4 necesita el horario de la escuela nueva en
 su bloque de `VALUES`. 5 y 6 son de este arranque y no se repiten.
+
+---
+
+## Sprint 4 — Preview Tech Week · en curso (28 sep → 9 oct 2026)
+
+Construido desde Cowork (Portal Agent) sobre la Mac de Roberto. Ver `CHANGELOG.md`
+para el resumen legible; aquí lo técnico.
+
+### Migración 0010 — aplicada en prod 30 sep 2026
+
+`0010_events_news_parent_read.sql`: enums `event_type`, `news_kind`; tablas
+`events`, `news_items` (RLS on, `set_updated_at`, columnas bilingües §3.2);
+helper `parent_child_school_ids()` (SECURITY DEFINER, patrón 0004); 9 policies
+(`events`/`news_items`: admin FOR ALL, coordinator FOR ALL por `user_school_ids_as_coordinator()`,
+parent SELECT `is_published and school_id in parent_child_school_ids()`;
+`class_sessions` parent SELECT por `parent_child_activity_ids()`; `class_attendance`
+parent SELECT por `parent_child_student_ids()`; `activities` parent SELECT catálogo
+activo por `parent_child_school_ids()`). Verificación al final del archivo cuenta
+las 9 policies. Próximo número libre: **0011**.
+
+### Tests
+
+`tests/rls/sprint-4-parent-read.test.ts` (7): eventos/noticias solo publicados y
+de la escuela de su hijo; sesiones solo de actividades inscritas; asistencia solo
+del propio hijo aunque otro comparta sesión; catálogo activo sin inactivas ni de
+otra escuela; parent no puede INSERT; control positivo con padre de otra escuela.
+Prefijo `__rlstest_s4par_`, cleanup FK-safe (events/news antes de schools por
+RESTRICT). Suite: 127/127 ×1 (30 sep, Terminal de Roberto).
+
+### Código nuevo
+
+- `lib/parent-attendance.ts`: `rel()`, `panamaMonthRange`, `monthSummaryFor`,
+  `nextSessionFor`, `STATUS_DISPLAY`.
+- `app/(parent)/{page,progress,calendar,news,profile}` reescritas; `layout.tsx`
+  usa `components/shared/parent-nav.tsx` (client, `usePathname`).
+- `components/shared/copy-button.tsx` (client).
+- `app/layout.tsx`: metadata PWA + `viewport`; `public/manifest.json`;
+  `public/icons/{icon-192,icon-512,apple-touch-icon}.png` placeholder.
+- `app/auth/callback/route.ts`: acepta `token_hash` (verifyOtp) además de `code`;
+  professor → `/professor`. `app/auth/enter/page.tsx`: página con botón.
+- `supabase/scripts/demo-login-link.ts`: imprime `/auth/enter?token_hash=…`
+  para `padre|padre2|coord|prof`; rechaza emails no-demo.
+- `app/(admin)/admin/page.tsx`: overview con conteos.
+
+### Incidente registrado
+
+`e.activities.map is not a function` en las tres pantallas nuevas: Supabase
+devuelve el embed to-one `enrollments → activities` como **objeto** en runtime
+aunque el tipo original decía array; el home viejo sobrevivía porque `flatMap`
+tolera no-arrays. Fix: `rel()`. Regla candidata para AGENTS §9.
+
+### Límites operativos del Portal Agent desde Cowork (para no re-descubrirlos)
+
+- Shell en la Mac = VM Linux: `node_modules` es darwin → `vitest` y `next build`
+  no corren (bindings nativos). `tsc --noEmit` y `eslint` sí.
+- Sin salida a `*.supabase.co` desde esa shell. Sin credenciales de git para push.
+- El clasificador bloquea ejecutar SQL contra el proyecto `portesco-portal-prod`
+  vía Chrome. Roberto corre las migraciones en Studio (`pbcopy < archivo`).
+- Claude in Chrome sí sirve para verificar pantallas en `localhost:3000` con la
+  sesión que Roberto abra en ese perfil.
+
+### Pendiente (T7)
+
+Logo real → iconos; re-correr `seed-demo-school.sql` el 9 o 10 oct (ventana de
+sesiones relativa a la fecha); confirmar login demo desde iPhone (30 sep: no
+confirmado — probable preview fetch o deploy en curso; `/auth/enter` ya está);
+smoke completo por rol; Loom; `AGENTS.md` §8/§9 sync.
