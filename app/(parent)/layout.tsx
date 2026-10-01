@@ -1,6 +1,8 @@
 import { LogoutButton } from "@/components/shared/logout-button";
+import { ParentNav } from "@/components/shared/parent-nav";
 
-// Parent portal layout with header (logout) + bottom navigation.
+// Parent portal layout with header (logout) + bottom navigation (Sprint 4 T5:
+// links reales a las 5 pantallas, con estado activo).
 export default function ParentLayout({
   children,
 }: {
@@ -15,18 +17,8 @@ export default function ParentLayout({
         <p className="text-sm font-semibold">PORTESCO</p>
         <LogoutButton className="text-xs font-medium text-[color:var(--portesco-gray-mid)] hover:text-[color:var(--portesco-blue)] disabled:opacity-50" />
       </header>
-      <main className="flex-1 pb-20">{children}</main>
-      {/* Bottom navigation — Sprint 2 */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-gray-100 flex items-center justify-around px-4"
-        style={{ color: "var(--portesco-blue)" }}
-      >
-        <span className="text-xs">Inicio</span>
-        <span className="text-xs">Avance</span>
-        <span className="text-xs">Calendario</span>
-        <span className="text-xs">Noticias</span>
-        <span className="text-xs">Perfil</span>
-      </nav>
+      <main className="flex-1 pb-24">{children}</main>
+      <ParentNav />
     </div>
   );
 }

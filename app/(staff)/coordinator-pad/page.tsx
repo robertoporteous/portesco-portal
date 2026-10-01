@@ -133,7 +133,7 @@ export default async function CoordinatorPadPage() {
                           COLA section shows "voice notes de Alexander". Fix = add
                           that SELECT policy in the Sprint 3 RLS batch (migration 0009). */}
                       <p className="text-xs text-[color:var(--portesco-gray-mid)]">
-                        {count} enrolled
+                        {count} inscritos
                       </p>
                     </div>
                     <Badge variant="secondary">
