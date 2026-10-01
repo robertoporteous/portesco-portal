@@ -1,6 +1,6 @@
 -- supabase/scripts/cleanup-demo-school.sql
--- Sprint 4 — Preview Tech Week. Borra EXACTAMENTE lo que siembra
--- seed-demo-school.sql (+ create-demo-users.ts) y nada más.
+-- Sprint 4 — Preview Tech Week. Borra EXACTAMENTE lo que siembran
+-- seed-demo-school.sql, seed-demo-feed.sql y create-demo-users.ts, y nada más.
 --
 -- ALCANCE: el colegio con slug 'demo' y todo lo que cuelga de él, más los 4
 --   users demo por email EXACTO (no LIKE: un LIKE amplio podría alcanzar un user
@@ -19,7 +19,8 @@
 --   5. schools demo                      (cascadea staff_schools, internal_alerts)
 --   6. auth.users demo                   (cascadea public.users, feedback_events;
 --                                          audit_logs.user_id → SET NULL)
---   T1 agrega events / news_items del colegio demo: se borran antes del paso 5.
+--   5a. events / news_items del colegio demo (school_id RESTRICT, 0010) van
+--       antes que la school; su created_by es SET NULL.
 --
 -- EJECUTAR EN: Supabase Studio SQL Editor. Idempotente (segunda corrida = 0 filas).
 
@@ -59,7 +60,17 @@ DELETE FROM students s
 USING schools sc
 WHERE sc.id = s.school_id AND sc.slug = 'demo';
 
--- 5. Colegio
+-- 5a. Feed del colegio (0010: events/news_items.school_id RESTRICT).
+--     Guard por si la 0010 todavía no está aplicada.
+DO $$
+BEGIN
+  IF to_regclass('public.events') IS NOT NULL THEN
+    DELETE FROM events WHERE school_id IN (SELECT id FROM schools WHERE slug = 'demo');
+    DELETE FROM news_items WHERE school_id IN (SELECT id FROM schools WHERE slug = 'demo');
+  END IF;
+END $$;
+
+-- 5b. Colegio
 DELETE FROM schools WHERE slug = 'demo';
 
 -- 6. Users (auth → public.users en cascada)
