@@ -30,8 +30,14 @@ export async function proxy(request: NextRequest) {
     .eq("id", user.id)
     .maybeSingle();
 
-  // No profile row yet → let the page render (empty state handled there).
-  if (!profile) return supabaseResponse;
+  // No profile row yet → let the page render (empty state handled there),
+  // salvo /admin: sin perfil no hay admin (1 oct 2026 — un auth user sin fila
+  // en public.users entraba al panel y RLS le devolvía todo vacío).
+  if (!profile) {
+    return pathname.startsWith("/admin")
+      ? redirectPreservingCookies(request, "/", supabaseResponse)
+      : supabaseResponse;
+  }
 
   const isAdmin = profile.is_admin || profile.role === "admin";
   const isCoordinator = profile.role === "coordinator";
