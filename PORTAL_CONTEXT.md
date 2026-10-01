@@ -114,6 +114,7 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 
 ## 10 · Log de actualizaciones
 
+- 1 oct 2026 — Bug encontrado al probar T9 como admin: `is_admin()` solo miraba `users.is_admin`, `proxy.ts` también acepta `role='admin'` → el admin entraba y veía todo vacío. Fix: **0011** redefine `is_admin()` = `is_admin OR role='admin'` (una sola regla para app y RLS).
 - 30 sep 2026 (madrugada) — T8 catálogo + T9 admin de publicación en `main`/`demo` (commits `1e17e38`, `c7072e3`). Nuevo script `seed-demo-catalog.sql`. Guion del demo escrito.
 - 30 sep 2026 (noche) — T1-T6 construidos y en `main`. Límites del Portal Agent desde Cowork anotados: no corre `npm test`/`next build` (VM Linux vs node_modules Mac), no llega a Supabase, no hace push, no ejecuta SQL contra prod (bloqueo del clasificador). Esos 4 pasos son de Roberto.
 
