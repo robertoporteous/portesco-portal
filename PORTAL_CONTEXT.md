@@ -37,7 +37,9 @@
 Tablas sin UI: `feedback_events`, `internal_alerts` (el trigger sí escribe), `bi_weekly_reports`, `wa_inbox`, `student_profiles` / `profile_observations` (sin lectura).
 No existe: `regions`, columnas bilingües (salvo las que agregue 0010), `events`, `news_items`, `consent_records`, `parent_child_relationships`.
 
-**Sprint 4 al 30 sep (noche), en `main` y desplegado en `app.portescosports.com`:** migración **0010** aplicada (`events`, `news_items`, 9 policies de padre, helper `parent_child_school_ids()`); lado padre completo — Inicio (asistencia del mes + próxima práctica por hijo), Avance, Calendario, Noticias, Perfil con Pago, bottom nav real, PWA instalable (iconos placeholder); `/auth/enter` + `demo-login-link.ts` para entrar como users demo; admin overview con conteos. Tests 127/127. Verificado en Chrome como `demo-padre`. **Pendiente T7:** logo real, re-seed antes del 11, smoke en iPhone (el link de acceso en el iPhone aún no se confirmó funcionando), Loom.
+**Sprint 4 al 30 sep (noche), en `main` y desplegado en `app.portescosports.com`:** migración **0010** aplicada (`events`, `news_items`, 9 policies de padre, helper `parent_child_school_ids()`); lado padre completo — Inicio (asistencia del mes + próxima práctica por hijo), Avance, Calendario, Noticias, Perfil con Pago, bottom nav real, PWA instalable (iconos placeholder); `/auth/enter` + `demo-login-link.ts` para entrar como users demo; admin overview con conteos. Tests 127/127. Verificado en Chrome como `demo-padre`. Logo real (wordmark del deck) en iconos PWA; calendario rediseñado como grilla mensual compacta; liga FCC Sub 18 real como fixtures demo. **Pendiente T7:** re-seed antes del 11, smoke en iPhone (el link de acceso en el iPhone aún no se confirmó funcionando), Loom.
+
+**Sprint 4 extendido (30 sep, madrugada):** **T8** catálogo de actividades del colegio para el padre (`/activities`, precio/horario/cupos, badge "Inscrito", CTA WhatsApp a `schools.coordination_phone`; `seed-demo-catalog.sql` pone precios ficticios) y **T9** admin CRUD mínimo del feed (`/admin/news`, `/admin/events`: crear, publicar/borrador, borrar — Server Actions sobre RLS 0010; sidebar admin con enlaces reales). T9 **no verificado visualmente** por el agente (solo tsc/eslint): el Chrome del agente tiene sesión de `demo-padre`, no admin — Roberto lo prueba. Guion del demo: `Proyecto - TechLab/03-herramientas/Portal/demo-techweek-guion.md`.
 
 ## 4 · Sprint actual: **Sprint 4 — Preview Tech Week (11 oct 2026)**
 
@@ -47,7 +49,7 @@ No existe: `regions`, columnas bilingües (salvo las que agregue 0010), `events`
 
 | SÍ (en orden) | NO (hasta después del 11 oct) |
 |---|---|
-| T0 seed Colegio Demo + rama `demo` + preview Vercel · T1 migración 0010 (`events`, `news_items`, policies de padre) · T2 asistencia del hijo + horario de prácticas · T3 calendario (eventos + prácticas) · T4 feed del colegio · T5 pago + perfil + PWA install · T6 admin overview mínimo (stretch) · T7 datos de demo pulidos + smoke iPhone + Loom | Recordatorios push · tienda (solo link) · PortescoPay · admin CRUD del feed · cambios a voz o al Pad · multi-region · i18n · invitar padres reales · macro agent completo · Mac mini |
+| T0 seed Colegio Demo + rama `demo` + preview Vercel · T1 migración 0010 (`events`, `news_items`, policies de padre) · T2 asistencia del hijo + horario de prácticas · T3 calendario (eventos + prácticas) · T4 feed del colegio · T5 pago + perfil + PWA install · T6 admin overview mínimo (stretch) · T7 datos de demo pulidos + smoke iPhone + Loom · T8 catálogo de actividades (padre) · T9 admin publica noticias/eventos | Recordatorios push · tienda (solo link) · PortescoPay · cambios a voz o al Pad · multi-region · i18n · invitar padres reales · macro agent completo · Mac mini |
 
 Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-preview-techweek-claude-code-prompt.md`.
 
@@ -112,6 +114,7 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 
 ## 10 · Log de actualizaciones
 
+- 30 sep 2026 (madrugada) — T8 catálogo + T9 admin de publicación en `main`/`demo` (commits `1e17e38`, `c7072e3`). Nuevo script `seed-demo-catalog.sql`. Guion del demo escrito.
 - 30 sep 2026 (noche) — T1-T6 construidos y en `main`. Límites del Portal Agent desde Cowork anotados: no corre `npm test`/`next build` (VM Linux vs node_modules Mac), no llega a Supabase, no hace push, no ejecuta SQL contra prod (bloqueo del clasificador). Esos 4 pasos son de Roberto.
 
 - 30 sep 2026 — T0 revisado: sin `portesco-dev`; demo en colegio ficticio aparte (`seed-demo-school.sql`); piloto CIDMI aún no arrancó.
