@@ -41,18 +41,19 @@ No existe: `regions`, columnas bilingües (salvo las que agregue 0010), `events`
 
 **Objetivo:** el 9 oct hay un Portal demostrable en el iPhone de Roberto, con un colegio ficticio, donde se recorre padre → coordinadora → profesor (voz) → admin en 5 minutos.
 
-**Regla central:** el preview vive en **`portesco-dev`** (proyecto Supabase aparte) + rama **`demo`** en Vercel. **No toca prod, no toca a los 162 niños de CIDMI, no toca el Pad que usa Kassandra.** Los tests corren contra dev.
+**Regla central (revisada 28-30 sep):** un solo proyecto Supabase (`itgxlrotwtjzxmaoqdah`, el actual) + rama **`demo`** en Vercel. El preview de `demo` usa las mismas env vars que production; `main` no se toca hasta después del 11 oct. **No se crea `portesco-dev` en este sprint.** El demo vive en un **colegio ficticio aparte, "Colegio Demo Portesco" (slug `demo`)**, dentro del mismo proyecto: 4 users `demo-*@portesco-test.com` (2 padres, 1 coordinadora, 1 profesor), 6 actividades, 4 estudiantes con nombres inventados, sesiones y asistencia propias. Se siembra con `supabase/scripts/create-demo-users.ts` + `seed-demo-school.sql` y se borra con `cleanup-demo-school.sql`. **CIDMI y Kassandra no se tocan.** Regla dura: ningún nombre de niño real aparece en el demo — por eso colegio aparte (el scope del coordinator es la escuela entera). Los eventos y noticias de T1 se siembran en el colegio demo copiando ligas/fechas reales de CIDMI (no es PII). `npm test` corre contra este proyecto (fixtures `__rlstest_*`, nunca borran fuera del prefijo).
 
 | SÍ (en orden) | NO (hasta después del 11 oct) |
 |---|---|
-| T0 `portesco-dev` + migraciones + seed demo + rama `demo` · T1 migración 0010 (`events`, `news_items`, policies de padre) · T2 asistencia del hijo + horario de prácticas · T3 calendario (eventos + prácticas) · T4 feed del colegio · T5 pago + perfil + PWA install · T6 admin overview mínimo (stretch) · T7 datos de demo pulidos + smoke iPhone + Loom | Recordatorios push · tienda (solo link) · PortescoPay · admin CRUD del feed · cambios a voz o al Pad · multi-region · i18n · invitar padres reales · macro agent completo · Mac mini |
+| T0 seed Colegio Demo + rama `demo` + preview Vercel · T1 migración 0010 (`events`, `news_items`, policies de padre) · T2 asistencia del hijo + horario de prácticas · T3 calendario (eventos + prácticas) · T4 feed del colegio · T5 pago + perfil + PWA install · T6 admin overview mínimo (stretch) · T7 datos de demo pulidos + smoke iPhone + Loom | Recordatorios push · tienda (solo link) · PortescoPay · admin CRUD del feed · cambios a voz o al Pad · multi-region · i18n · invitar padres reales · macro agent completo · Mac mini |
 
 Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-preview-techweek-claude-code-prompt.md`.
 
 **Después del 11 oct:** se agrega la info real (eventos y noticias de CIDMI desde Supabase Studio o admin UI), se invita a padres de CIDMI cuando el piloto de Kassandra cierre (día 14 = 23 oct), y ahí se decide Sprint 5.
 
-## 5 · Piloto CIDMI (28 sep – 23 oct 2026) — corre en paralelo, no se toca
+## 5 · Piloto CIDMI — corre en paralelo, no se toca
 
+- **Estado 30 sep 2026: el piloto NO arrancó.** Kassandra no ha entrado al Pad. Las fechas DIA_1 = 28 sep / día 7 / día 14 de abajo se corren cuando arranque.
 - Kassandra pasa asistencia SOLO en el Pad. Hipótesis única: una coordinadora real lo usa sin que Roberto la empuje.
 - Roberto **no pregunta hasta el día 7** (5 oct). Día 14 (23 oct): decisión seguir / ajustar / parar con las 5 métricas del PRD Sprint 3 §6.
 - Adopción se mide con `class_attendance` (filas marcadas por ella) y `class_sessions.closed_at`. **No con logins** (`last_sign_in_at` subcuenta).
@@ -62,7 +63,7 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 
 - `GATE(voice-launch)`: code review adversarial (RLS + redaction + ownership) **antes** de que un profesor real grabe. La demo con niños ficticios no lo activa.
 - Parent visibility (`sprint-2-architecture.md` §16.2): un padre **nunca** lee `profile_observations` directo. Opción A (tabla snapshot curada) decidida; se construye con el reporte bi-semanal.
-- Tests RLS contra prod: **prohibido desde el 24 sep** (162 menores reales). Solo contra `portesco-dev`.
+- Tests RLS contra este proyecto: **permitidos de nuevo** (decisión 28 sep, sin `portesco-dev`). Solo fixtures `__rlstest_*`; el guard de prod vuelve cuando exista `portesco-dev` (§8).
 - Pre-launch cleanup de voz: filas `pending_*` + audios huérfanos en `voice-obs`.
 - `DEBT(attendance)`: `markAttendance` no chequea `closed_at` server-side. Pagar en Sprint 5.
 
@@ -77,6 +78,7 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 | 8 sep 2026 | Voz parqueada con gate. Sprint 3 = piloto solo asistencia |
 | 24 sep 2026 | DIA_1 = 28 sep. Nadie prueba con usuarios reales |
 | 25 sep 2026 | Estudiante = sujeto, no usuario. Multi-region diferido al primer contrato fuera de Panamá. `portesco-dev` obligatorio antes de otro `npm test` |
+| 28 sep 2026 | Cambio de plan T0 (Roberto): **no se crea `portesco-dev`**; Sprint 4 usa el proyecto actual. El demo vive en un colegio ficticio aparte (slug `demo`) dentro del mismo proyecto, no dentro de CIDMI, para que ningún rol demo vea nombres reales. Guard de prod en `tests/_helpers/supabase.ts` diferido hasta que exista `portesco-dev`. Preview de `demo` con las mismas env vars que production |
 | 28 sep 2026 | Sprint 4 = preview para Tech Week en `portesco-dev` + rama `demo`. Lado padre = dos ejes (mi hijo / mi colegio). Este archivo es la fuente de verdad; vive en la raíz del repo |
 
 ## 8 · Preguntas abiertas
@@ -85,7 +87,8 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 2. ¿Ana entra al Portal o solo recibe CSV? Define si el export es endpoint admin o pantalla.
 3. ¿La carpeta `Proyecto - TechLab` se mueve al repo (`docs/techlab/`) o a un repo privado? Hoy no está en git.
 4. ¿Alexander sigue como profesor piloto de voz cuando abra Bloque 4?
-5. ¿Cuántas horas/día tiene Roberto del 29 sep al 9 oct? (Define si T6 entra.)
+5. **Crear `portesco-dev` antes de invitar usuarios reales** (padres de CIDMI o que arranque el piloto con datos que no se pueden borrar). Hasta entonces los tests y el demo comparten proyecto con la data de CIDMI.
+6. ¿Cuántas horas/día tiene Roberto del 29 sep al 9 oct? (Define si T6 entra.)
 
 ## 9 · Mapa de documentos — cuál manda para qué
 
@@ -106,4 +109,5 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 
 ## 10 · Log de actualizaciones
 
+- 30 sep 2026 — T0 revisado: sin `portesco-dev`; demo en colegio ficticio aparte (`seed-demo-school.sql`); piloto CIDMI aún no arrancó.
 - 28 sep 2026 — creado. Sprint 4 definido. Decisiones del 25 y 28 sep registradas.

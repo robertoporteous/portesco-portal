@@ -20,20 +20,30 @@ export type OverallRating =
   | "en_desarrollo"
   | "necesita_apoyo";
 
+// Mirrors enum event_type (0010).
 export type EventType =
   | "match"
   | "tournament"
   | "practice"
   | "festival"
   | "meeting"
-  | "deadline";
+  | "other";
 
-export type NewsType =
-  | "result"
+// Mirrors enum news_kind (0010).
+export type NewsKind =
   | "announcement"
-  | "gallery"
-  | "promotion"
-  | "reminder";
+  | "result"
+  | "photo"
+  | "promo"
+  | "payment_reminder";
+
+// Bilingual columns (AGENTS §3.2) over the table's user-facing text.
+export interface BilingualColumns {
+  original_lang: string | null;
+  display_lang: string | null;
+  translated_text: string | null;
+  translation_confidence: number | null;
+}
 
 // ---- Tables ----
 
@@ -145,32 +155,40 @@ export interface MonthlyReport {
   created_at: string;
 }
 
-export interface Event {
+// Table events (0010). Bilingual columns apply to `description`.
+export interface Event extends BilingualColumns {
   id: string;
   school_id: string;
   activity_id: string | null;
   title: string;
   description: string | null;
-  event_date: string;
-  start_time: string | null;
-  end_time: string | null;
+  event_type: EventType;
+  starts_at: string;
+  ends_at: string | null;
   location: string | null;
-  event_type: EventType | null;
   is_published: boolean;
+  created_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface News {
+// Table news_items (0010). `body` is plain text (AGENTS §4); bilingual
+// columns apply to it.
+export interface NewsItem extends BilingualColumns {
   id: string;
   school_id: string;
   activity_id: string | null;
+  kind: NewsKind;
   title: string;
-  body: string;
+  body: string | null;
   image_url: string | null;
-  news_type: NewsType | null;
+  link_url: string | null;
+  link_label: string | null;
   is_published: boolean;
   published_at: string;
+  created_by: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Photo {

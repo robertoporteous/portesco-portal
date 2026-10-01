@@ -22,6 +22,7 @@ function envOrThrow(name: string): string {
   return v;
 }
 
+// Guard de prod diferido hasta que exista portesco-dev (decisión 28 sep 2026).
 const SUPABASE_URL = envOrThrow('NEXT_PUBLIC_SUPABASE_URL');
 const ANON_KEY = envOrThrow('NEXT_PUBLIC_SUPABASE_ANON_KEY');
 const SERVICE_ROLE_KEY = envOrThrow('SUPABASE_SERVICE_ROLE_KEY');

@@ -6,13 +6,19 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  // Sprint 4: links generados server-side (supabase/scripts/demo-login-link.ts)
+  // llegan con token_hash en vez de code — patrón oficial de Supabase SSR.
+  // Mismo one-time token, misma expiración; solo cambia el verbo de canje.
+  const tokenHash = searchParams.get("token_hash");
 
-  if (!code) {
+  if (!code && !tokenHash) {
     return NextResponse.redirect(`${origin}/login?error=missing_code`);
   }
 
   const supabase = await createClient();
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  const { error: exchangeError } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: "magiclink" });
 
   if (exchangeError) {
     return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
@@ -51,8 +57,10 @@ export function resolveDestination(
     // clases del día (Sprint 3, piloto CIDMI).
     case "coordinator":
       return "/coordinator-pad";
+    // Sprint 4: el profesor cae en su surface real (/professor, Bloque 3), no
+    // en el stub /staff. El gate de voz sigue en proxy.ts (professor + admin).
     case "professor":
-      return "/staff";
+      return "/professor";
     case "parent":
     default:
       return "/";

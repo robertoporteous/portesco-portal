@@ -1,5 +1,17 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatPanamaNextSession } from "@/lib/dates";
+import {
+  rel,
+  monthSummaryFor,
+  nextSessionFor,
+  panamaMonthName,
+  panamaMonthRange,
+  type AttendanceRow,
+  type MonthSummary,
+  type SessionRow,
+} from "@/lib/parent-attendance";
 
 type Activity = {
   id: string;
@@ -11,8 +23,8 @@ type Activity = {
 
 type Enrollment = {
   id: string;
-  // Supabase types FK joins as arrays even when the FK is single-valued.
-  activities: Activity[];
+  // Supabase returns the to-one embed as an object at runtime; always wrap with rel().
+  activities: Activity | Activity[];
 };
 
 type Student = {
@@ -77,6 +89,41 @@ export default async function ParentHomePage() {
   const firstName = profileResult.data?.full_name?.split(" ")[0] ?? null;
   const students = (studentsResult.data ?? []) as Student[];
 
+  // ── Sprint 4 T2: asistencia del mes + próxima práctica ──
+  // One query for sessions (this month → +60 days) across every activity of
+  // every kid, one for this month's attendance rows. RLS (0010) already scopes
+  // both to this parent; the activity_id filter only keeps the payload small.
+  const activityIds = Array.from(
+    new Set(students.flatMap((s) => s.enrollments.flatMap((e) => rel(e.activities).map((a) => a.id))))
+  );
+  const now = new Date();
+  const month = panamaMonthRange(now);
+  const horizon = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+  let sessions: SessionRow[] = [];
+  let attendance: AttendanceRow[] = [];
+  if (activityIds.length > 0) {
+    const [sessionsResult, attendanceResult] = await Promise.all([
+      supabase
+        .from("class_sessions")
+        .select("id, activity_id, scheduled_start_at, closed_at")
+        .in("activity_id", activityIds)
+        .gte("scheduled_start_at", month.start.toISOString())
+        .lt("scheduled_start_at", horizon.toISOString())
+        .order("scheduled_start_at", { ascending: true }),
+      supabase
+        .from("class_attendance")
+        .select("session_id, student_id, status, class_sessions!inner ( scheduled_start_at )")
+        .in("student_id", students.map((s) => s.id))
+        .gte("class_sessions.scheduled_start_at", month.start.toISOString())
+        .lt("class_sessions.scheduled_start_at", month.end.toISOString()),
+    ]);
+    sessions = (sessionsResult.data ?? []) as SessionRow[];
+    attendance = (attendanceResult.data ?? []) as AttendanceRow[];
+  }
+
+  const monthName = panamaMonthName(now);
+
   return (
     <div className="px-4 py-6 flex flex-col gap-5">
       <h1
@@ -90,18 +137,49 @@ export default async function ParentHomePage() {
         <EmptyState />
       ) : (
         <div className="flex flex-col gap-4">
-          {students.map((student) => (
-            <StudentCard key={student.id} student={student} />
-          ))}
+          {students.map((student) => {
+            const ids = new Set(student.enrollments.flatMap((e) => rel(e.activities).map((a) => a.id)));
+            const sessionsInMonth = sessions.filter(
+              (s) => new Date(s.scheduled_start_at) < month.end
+            );
+            const summary = monthSummaryFor(ids, student.id, sessionsInMonth, attendance);
+            const next = nextSessionFor(ids, sessions, now);
+            const nextActivity = next
+              ? student.enrollments.flatMap((e) => rel(e.activities)).find((a) => a.id === next.activity_id)
+              : null;
+            return (
+              <StudentCard
+                key={student.id}
+                student={student}
+                summary={summary}
+                monthName={monthName}
+                nextLabel={
+                  next && nextActivity
+                    ? `${formatPanamaNextSession(new Date(next.scheduled_start_at))} · ${nextActivity.name}`
+                    : null
+                }
+              />
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function StudentCard({ student }: { student: Student }) {
+function StudentCard({
+  student,
+  summary,
+  monthName,
+  nextLabel,
+}: {
+  student: Student;
+  summary: MonthSummary;
+  monthName: string;
+  nextLabel: string | null;
+}) {
   const activities = student.enrollments
-    .flatMap((e) => e.activities)
+    .flatMap((e) => rel(e.activities))
     .sort((a, b) => (a.start_time ?? "").localeCompare(b.start_time ?? ""));
 
   return (
@@ -121,6 +199,38 @@ function StudentCard({ student }: { student: Student }) {
           >
             {student.grade}
           </p>
+        </div>
+      </div>
+
+      {/* Sprint 4 T2 — asistencia del mes + próxima práctica */}
+      <div className="border-t border-gray-100 px-4 py-3 grid grid-cols-2 gap-3">
+        <Link
+          href={`/progress?student=${student.id}`}
+          className="rounded-xl bg-gray-50 px-3 py-2 flex flex-col"
+        >
+          <span
+            className="text-[11px] uppercase tracking-wide font-medium"
+            style={{ color: "var(--portesco-gray-mid)" }}
+          >
+            Asistencia de {monthName}
+          </span>
+          <span className="text-lg font-semibold text-gray-900">
+            {summary.closed === 0 ? "—" : `${summary.attended} de ${summary.closed}`}
+          </span>
+          <span className="text-[11px]" style={{ color: "var(--portesco-gray-mid)" }}>
+            {summary.closed === 0 ? "Sin clases cerradas aún" : "clases · ver detalle"}
+          </span>
+        </Link>
+        <div className="rounded-xl bg-gray-50 px-3 py-2 flex flex-col">
+          <span
+            className="text-[11px] uppercase tracking-wide font-medium"
+            style={{ color: "var(--portesco-gray-mid)" }}
+          >
+            Próxima práctica
+          </span>
+          <span className="text-sm font-semibold text-gray-900 leading-snug">
+            {nextLabel ?? "Sin prácticas programadas"}
+          </span>
         </div>
       </div>
 
