@@ -77,17 +77,19 @@ WHERE NOT EXISTS (
 -- ============================================================
 
 INSERT INTO news_items (school_id, activity_id, kind, title, body, image_url, link_url, link_label, published_at)
-SELECT sc.id, ac.id, n.kind::news_kind, n.title, n.body, NULL, n.link_url, n.link_label,
+SELECT sc.id, ac.id, n.kind::news_kind, n.title, n.body,
+       CASE WHEN n.kind = 'photo' THEN '/images/equipo-portesco.jpg' END,
+       n.link_url, n.link_label,
        now() - n.age
 FROM (VALUES
   ('result', 'Fútbol Secundaria 3 – 1 Colegio Visitante',
-   'Victoria en la Fecha 1 de la Liga Banco General. Gran trabajo en equipo y buena actitud de todo el grupo.',
+   'Victoria en la Semana 2 de la Liga FCC. Gran trabajo en equipo y buena actitud de todo el grupo.',
    NULL, NULL, interval '5 days', 'Fútbol Secundaria'),
-  ('photo', 'Así se vivió el entrenamiento de esta semana',
-   'Un vistazo a la práctica de Voleibol Primaria.',
-   NULL, NULL, interval '3 days', 'Voleibol Primaria'),
-  ('announcement', 'Calendario de la Liga Banco General',
-   'Ya están confirmadas las fechas 2 y 3. Revisa la sección Calendario para ver horarios y lugares.',
+  ('photo', 'Conoce al equipo PORTESCO',
+   'Roberto y Alejandra, fundadores de PORTESCO. Detrás de cada programa hay un equipo que coordina, acompaña y da seguimiento a tu hijo.',
+   NULL, NULL, interval '3 days', NULL),
+  ('announcement', 'Calendario de la Liga FCC Sub 18 Masculina',
+   'Ya están publicadas las semanas 3 a 6, los cuartos de final, semifinal y final. Revisa la sección Calendario para ver horarios y canchas.',
    NULL, NULL, interval '2 days', NULL),
   ('payment_reminder', 'Recordatorio: pago de octubre',
    'El pago mensual de las actividades vence el 10 de octubre. Puedes pagar por Yappy o transferencia desde tu Perfil.',

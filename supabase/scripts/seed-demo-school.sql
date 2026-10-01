@@ -4,7 +4,7 @@
 -- QUÉ HACE
 --   Siembra un colegio FICTICIO, aislado de CIDMI, en el mismo proyecto:
 --     1 school (slug 'demo') · 4 users (2 padres, 1 coordinadora, 1 profesor)
---     6 actividades · 4 estudiantes con nombres INVENTADOS · enrollments
+--     7 actividades (T7: + Flag Football Secundaria, liga FCC Sub 18) · 4 estudiantes con nombres INVENTADOS · enrollments
 --     class_sessions de 3 semanas atrás a 2 adelante · asistencia de las pasadas
 --
 --   Aislamiento (por qué un colegio aparte y no dentro de CIDMI): el scope de un
@@ -108,7 +108,8 @@ FROM (VALUES
   ('Voleibol Primaria',     'deporte',   'Martes y jueves 2:30-4:00 PM',   array['martes', 'jueves']),
   ('Basketball Primaria',   'deporte',   'Lunes y miércoles 2:30-4:00 PM', array['lunes', 'miercoles']),
   ('Baile Urbano Primaria', 'arte',      'Martes y jueves 2:30-4:00 PM',   array['martes', 'jueves']),
-  ('Ajedrez Primaria',      'academico', 'Viernes 2:30-4:00 PM',           array['viernes'])
+  ('Ajedrez Primaria',      'academico', 'Viernes 2:30-4:00 PM',           array['viernes']),
+  ('Flag Football Secundaria','deporte',  'Jueves 2:30-4:00 PM',            array['jueves'])
 ) AS a(name, category, schedule, days)
 JOIN schools sc ON sc.slug = 'demo'
 -- Sin filtro is_active en el guard: no duplicar una actividad desactivada.
@@ -153,6 +154,7 @@ FROM (VALUES
   ('Mateo Navarro',       'Fútbol Primaria'),
   ('Mateo Navarro',       'Ajedrez Primaria'),
   ('Sofía Navarro',       'Fútbol Secundaria'),
+  ('Sofía Navarro',       'Flag Football Secundaria'),
   ('Lucas Iturralde',     'Fútbol Primaria'),
   ('Lucas Iturralde',     'Voleibol Primaria'),
   ('Lucas Iturralde',     'Basketball Primaria'),
@@ -183,7 +185,8 @@ bloques(activity_name, dia_offset) AS (VALUES
   ('Fútbol Secundaria',     1), ('Fútbol Secundaria',     3),
   ('Voleibol Primaria',     1), ('Voleibol Primaria',     3),
   ('Baile Urbano Primaria', 1), ('Baile Urbano Primaria', 3),
-  ('Ajedrez Primaria',      4)
+  ('Ajedrez Primaria',      4),
+  ('Flag Football Secundaria', 3)
 ),
 sesiones AS (
   SELECT
@@ -264,8 +267,8 @@ BEGIN
   SELECT count(*) INTO n_enr FROM enrollments e JOIN students s ON s.id = e.student_id
   WHERE s.school_id = demo_id;
 
-  IF n_act <> 6 OR n_stu <> 4 OR n_enr <> 8 THEN
-    RAISE EXCEPTION 'Verificación: actividades=% (6), estudiantes=% (4), enrollments=% (8). Rollback.',
+  IF n_act <> 7 OR n_stu <> 4 OR n_enr <> 9 THEN
+    RAISE EXCEPTION 'Verificación: actividades=% (7), estudiantes=% (4), enrollments=% (9). Rollback.',
       n_act, n_stu, n_enr;
   END IF;
 
