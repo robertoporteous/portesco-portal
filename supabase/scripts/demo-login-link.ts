@@ -9,8 +9,9 @@
  *   roles: padre | padre2 | coord | prof
  *   opcional: --base https://portesco-portal-git-demo-....vercel.app  (default: NEXT_PUBLIC_APP_URL)
  *
- * Imprime UNA URL. Abrirla en el teléfono/navegador crea la sesión y redirige
- * por rol. El token caduca (config de Auth, típicamente 1 h) y es de un solo
+ * Imprime UNA URL a /auth/enter. Abrirla muestra un botón "Entrar al Portal";
+ * al tocarlo se crea la sesión y redirige por rol. Se puede mandar por
+ * WhatsApp sin que la vista previa gaste el token. El token caduca (config de Auth, típicamente 1 h) y es de un solo
  * uso: generá uno nuevo cada vez.
  *
  * Solo users demo-*: el script se niega a generar links de cualquier otro email
@@ -52,4 +53,6 @@ if (error) throw new Error(`generateLink falló para ${email}: ${error.message}`
 const tokenHash = data?.properties?.hashed_token;
 if (!tokenHash) throw new Error(`Sin hashed_token para ${email}`);
 
-console.log(`${base}/auth/callback?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`);
+// /auth/enter muestra un botón; el canje del token ocurre al tocarlo. Un link
+// directo a /auth/callback se gastaría con la vista previa de WhatsApp/iMessage.
+console.log(`${base}/auth/enter?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`);
