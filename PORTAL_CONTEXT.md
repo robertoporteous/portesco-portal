@@ -116,7 +116,8 @@ Brief completo: `Proyecto - TechLab/03-herramientas/Portal/sprints/sprint-4-prev
 
 - 1 oct 2026 — Bug encontrado al probar T9 como admin: `is_admin()` solo miraba `users.is_admin`, `proxy.ts` también acepta `role='admin'` → el admin entraba y veía todo vacío. Fix: **0011** redefine `is_admin()` = `is_admin OR role='admin'` (una sola regla para app y RLS).
 - 30 sep 2026 (madrugada) — T8 catálogo + T9 admin de publicación en `main`/`demo` (commits `1e17e38`, `c7072e3`). Nuevo script `seed-demo-catalog.sql`. Guion del demo escrito.
-- 30 sep 2026 (noche) — T1-T6 construidos y en `main`. Límites del Portal Agent desde Cowork anotados: no corre `npm test`/`next build` (VM Linux vs node_modules Mac), no llega a Supabase, no hace push, no ejecuta SQL contra prod (bloqueo del clasificador). Esos 4 pasos son de Roberto.
+- 1 oct 2026 — **El agente ya hace `git push` solo.** Repo GitHub conectado a la sesión de Cowork (clon en la nube con credenciales). Flujo: commit en la carpeta del Mac → `git bundle create .git/sync.bundle main demo` → stage del bundle a la nube → `git fetch` + `git push origin refs/sync/main:main refs/sync/demo:demo`. Roberto ya no corre `git push`. Siguen siendo de Roberto: `npm test` (Supabase no es alcanzable ni desde el Mac-VM ni desde la nube) y el SQL en Studio. `tsc --noEmit` corre en ambos lados; `next build` en la nube falla solo por Google Fonts (sin red) — el build real lo hace Vercel.
+- 30 sep 2026 (noche) — T1-T6 construidos y en `main`. Límites del Portal Agent desde Cowork anotados: no corre `npm test`/`next build` (VM Linux vs node_modules Mac), no llega a Supabase, no hace push (resuelto 1 oct, ver arriba), no ejecuta SQL contra prod (bloqueo del clasificador). Esos pasos son de Roberto.
 
 - 30 sep 2026 — T0 revisado: sin `portesco-dev`; demo en colegio ficticio aparte (`seed-demo-school.sql`); piloto CIDMI aún no arrancó.
 - 28 sep 2026 — creado. Sprint 4 definido. Decisiones del 25 y 28 sep registradas.
