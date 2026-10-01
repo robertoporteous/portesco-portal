@@ -163,6 +163,21 @@ export default async function ParentHomePage() {
           })}
         </div>
       )}
+
+      {/* Sprint 4 T8 — catálogo del colegio */}
+      {students.length > 0 && (
+        <Link
+          href="/activities"
+          className="rounded-2xl px-4 py-3 flex items-center justify-between text-white"
+          style={{ backgroundColor: "var(--portesco-blue)" }}
+        >
+          <span className="flex flex-col">
+            <span className="text-sm font-semibold">Ver todas las actividades del colegio</span>
+            <span className="text-[11px] opacity-80">Horarios, precios y cómo inscribir</span>
+          </span>
+          <span aria-hidden className="text-lg">→</span>
+        </Link>
+      )}
     </div>
   );
 }
