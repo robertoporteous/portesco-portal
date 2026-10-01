@@ -21,8 +21,8 @@ describe('resolveDestination — post-login por rol', () => {
     expect(resolveDestination(p('coordinator'))).toBe('/coordinator-pad');
   });
 
-  it('professor → /staff (sin cambios)', () => {
-    expect(resolveDestination(p('professor'))).toBe('/staff');
+  it('professor → /professor (Sprint 4: su surface real, no el stub /staff)', () => {
+    expect(resolveDestination(p('professor'))).toBe('/professor');
   });
 
   it('admin por rol → /admin (sin cambios)', () => {
