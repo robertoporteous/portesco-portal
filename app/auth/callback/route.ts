@@ -20,13 +20,17 @@ export async function GET(request: NextRequest) {
     ? await supabase.auth.exchangeCodeForSession(code)
     : await supabase.auth.verifyOtp({ token_hash: tokenHash!, type: "magiclink" });
 
-  if (exchangeError) {
-    return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
-  }
-
+  // Idempotencia (2 oct 2026): en iPhone un doble toque a "Entrar al Portal"
+  // manda dos GET; el primero crea la sesión y el segundo encuentra el token
+  // gastado. Antes el segundo ganaba la pantalla y mandaba a /login aunque la
+  // cookie ya estuviera puesta. Si el canje falla pero YA hay sesión, seguimos.
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (exchangeError && !user) {
+    return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+  }
 
   if (!user) {
     return NextResponse.redirect(`${origin}/login?error=no_session`);

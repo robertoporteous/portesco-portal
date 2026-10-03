@@ -7,6 +7,8 @@
 // botón. El canje ocurre en /auth/callback cuando el usuario lo toca.
 // Ruta pública (proxy.ts deja pasar /auth/*). Sin sesión, sin datos.
 
+import { EnterForm } from "./enter-form";
+
 export const dynamic = "force-dynamic";
 
 export default async function EnterPage({
@@ -29,17 +31,7 @@ export default async function EnterPage({
             <p className="text-sm" style={{ color: "var(--portesco-gray-mid)" }}>
               Toca el botón para entrar al Portal. El enlace sirve una sola vez.
             </p>
-            <form method="GET" action="/auth/callback">
-              <input type="hidden" name="token_hash" value={tokenHash} />
-              <input type="hidden" name="type" value={type ?? "magiclink"} />
-              <button
-                type="submit"
-                className="w-full rounded-xl py-3 text-base font-semibold text-white"
-                style={{ backgroundColor: "var(--portesco-red)" }}
-              >
-                Entrar al Portal
-              </button>
-            </form>
+            <EnterForm tokenHash={tokenHash!} type={type ?? "magiclink"} />
           </>
         ) : (
           <>
